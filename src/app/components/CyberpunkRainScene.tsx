@@ -157,7 +157,7 @@ export default function CyberpunkRainScene({ onReady }: { onReady?: () => void }
       ease: "sine.inOut",
     });
 
-    let start = performance.now();
+  const start = performance.now();
     let raf = 0;
     const render = (now: number) => {
       raf = requestAnimationFrame(render);

@@ -28,7 +28,8 @@ export default function CardView({ c, hidden = false, image }: { c: Card; hidden
       ) : (
         // if an image url is provided and it loads, show it; otherwise fallback to old render
         image && !imgError ? (
-          <img
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
             src={image}
             alt={`${c.rank} de ${c.suit}`}
             className="w-full h-full object-cover"

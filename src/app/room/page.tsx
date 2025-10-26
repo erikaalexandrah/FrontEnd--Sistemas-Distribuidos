@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import CardView, { Card } from "@/app/components/Card";
 import CyberpunkRainScene from "@/app/components/CyberpunkRainScene";
@@ -47,7 +47,13 @@ function HandView({ hand, hideFirst = false }: { hand: Hand; hideFirst?: boolean
 }
 
 /* CHAT */
-function ChatPanel({ playerName, t }: { playerName: string; t: any }) {
+type ChatTranslations = {
+  noMessages: string;
+  typeMessage: string;
+  send: string;
+};
+
+function ChatPanel({ playerName, t }: { playerName: string; t: ChatTranslations }) {
   const [messages, setMessages] = useState<{ user: string; text: string }[]>([]);
   const [input, setInput] = useState("");
   const bottomRef = useRef<HTMLDivElement | null>(null);
