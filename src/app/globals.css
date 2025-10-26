@@ -1,0 +1,98 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700&family=Share+Tech+Mono&display=swap');
+@import "tailwindcss";
+
+/* === Fuentes base === */
+:root {
+  --font-title: 'Orbitron', sans-serif;
+  --font-body: 'Share Tech Mono', monospace;
+}
+
+/* === Animaciones sutiles tipo ciberlluvia === */
+@keyframes rainGlow {
+  0%, 100% { opacity: 0.5; filter: blur(1px); }
+  50% { opacity: 1; filter: blur(2px); }
+}
+
+@keyframes neonFade {
+  0%, 100% { text-shadow: 0 0 18px #0066ff, 0 0 25px #00aaff; opacity: 1; }
+  50% { text-shadow: 0 0 8px #0044aa, 0 0 10px #0055cc; opacity: 0.8; }
+}
+
+@keyframes shine {
+  0% { transform: translateX(-150%); }
+  100% { transform: translateX(150%); }
+}
+
+/* === Clases de animación === */
+.animate-neonFade {
+  animation: neonFade 4s ease-in-out infinite;
+}
+
+.animate-shine {
+  animation: shine 4s linear infinite;
+  mix-blend-mode: overlay;
+}
+
+/* === Estilo base === */
+body {
+  background-color: #050510;
+  font-family: var(--font-body);
+  color: #ccd6ff;
+  letter-spacing: 0.02em;
+}
+
+h1, h2 {
+  font-family: var(--font-title);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #d1e3ff;
+}
+
+@keyframes cyberGlow {
+  0%, 100% { box-shadow: 0 0 45px #00fff933, 0 0 6px #03173770 inset; }
+  60% { box-shadow: 0 0 85px #00f0ff44, 0 0 8px #03173770 inset; }
+}
+.animate-cyberGlow {
+  animation: cyberGlow 6s ease-in-out infinite;
+}
+
+
+@keyframes shine {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+.animate-shine {
+  animation: shine 2.5s infinite linear;
+}
+
+@keyframes pulse-slow {
+  0%, 100% { opacity: 1; box-shadow: 0 0 30px rgba(0,255,255,0.25); }
+  50% { opacity: 0.85; box-shadow: 0 0 60px rgba(0,255,200,0.5); }
+}
+.animate-pulse-slow {
+  animation: pulse-slow 3.2s infinite ease-in-out;
+}
+
+@keyframes fade-in-slow {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in-slow {
+  animation: fade-in-slow 1.8s ease-out forwards;
+}
+
+@keyframes fade-in-slower {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in-slower {
+  animation: fade-in-slower 2.8s ease-out forwards;
+}
+
+@keyframes scanline {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+.animate-scanline {
+  animation: scanline 3s infinite ease-in-out;
+}
