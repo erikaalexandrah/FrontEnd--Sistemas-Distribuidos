@@ -8,7 +8,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 // Helper para reproducir sonido
-function playSound(ref: React.RefObject<HTMLAudioElement>) {
+function playSound(ref: React.RefObject<HTMLAudioElement | null>) {
   if (ref.current) {
     ref.current.currentTime = 0;
     ref.current.play().catch(() => {});
