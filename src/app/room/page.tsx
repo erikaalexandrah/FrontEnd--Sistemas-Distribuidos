@@ -11,13 +11,13 @@ import { GAME_TRANSLATIONS } from "@/app/utils/traductions/game";
 type Hand = Card[];
 
 function makeDeck(decks = 1): Card[] {
-  const ranks = ["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
-  const suits: Card["suit"][] = ["♠","♥","♦","♣"];
+  const ranks = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
+  const suits: Card["suit"][] = ["♠", "♥", "♦", "♣"];
   const deck: Card[] = [];
   for (let n = 0; n < decks; n++) {
     for (const suit of suits) {
       for (const rank of ranks) {
-        const value = rank === "A" ? 11 : ["J","Q","K"].includes(rank) ? 10 : Number(rank);
+        const value = rank === "A" ? 11 : ["J", "Q", "K"].includes(rank) ? 10 : Number(rank);
         deck.push({ id: `${n}-${suit}-${rank}`, rank, suit, value });
       }
     }
@@ -31,22 +31,22 @@ function makeDeck(decks = 1): Card[] {
 
 function HandView({ hand, hideFirst = false }: { hand: Hand; hideFirst?: boolean }) {
   const suitMap: Record<string, string> = {
-    "♠": "spades",
-    "♥": "hearts",
-    "♦": "diamonds",
-    "♣": "clubs",
+    "♠": "spade",
+    "♥": "heart",
+    "♦": "diamond",
+    "♣": "clover",
   };
   return (
     <div className="flex gap-2 items-center flex-wrap justify-center">
       {hand.map((c, i) => {
-        const img = `/images/cards/${String(c.rank).toLowerCase()}_of_${suitMap[c.suit]}.png`;
+        const code = `${String(c.rank).toLowerCase()}-${suitMap[c.suit]}`;
+        const img = `/assets/cards/${code}.png`;
         return <CardView key={c.id} c={c} hidden={hideFirst && i === 0} image={img} />;
       })}
     </div>
   );
 }
 
-/* CHAT */
 type ChatTranslations = {
   noMessages: string;
   typeMessage: string;
@@ -105,11 +105,9 @@ export default function GameRoom() {
   const router = useRouter();
   const [dealer, setDealer] = useState<Hand>([]);
   const [player, setPlayer] = useState<Hand>([]);
-  const [deck, setDeck] = useState<Card[]>([]);
+  const [, setDeck] = useState<Card[]>([]);
   const [playerName, setPlayerName] = useState("Operador_21");
-  const [t, setT] = useState<
-    typeof GAME_TRANSLATIONS[keyof typeof GAME_TRANSLATIONS]
-  >(GAME_TRANSLATIONS.es);
+  const [t, setT] = useState<typeof GAME_TRANSLATIONS[keyof typeof GAME_TRANSLATIONS]>(GAME_TRANSLATIONS.es);
 
   useEffect(() => {
     const allowed = sessionStorage.getItem("gameAllowed");

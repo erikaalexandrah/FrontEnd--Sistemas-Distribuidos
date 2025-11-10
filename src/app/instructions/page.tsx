@@ -7,13 +7,11 @@ import { getSettings } from "../utils/settings";
 import { INSTRUCTIONS_TRANSLATIONS } from "../utils/traductions/instructions";
 
 export default function InstructionsPage() {
-  const [lang, setLang] = useState<"es" | "en" | "pt">("es");
   const [t, setT] = useState(INSTRUCTIONS_TRANSLATIONS.es);
 
   useEffect(() => {
     const s = getSettings();
     const language = s.language || "es";
-    setLang(language);
     setT(INSTRUCTIONS_TRANSLATIONS[language]);
   }, []);
 

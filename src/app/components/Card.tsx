@@ -1,5 +1,5 @@
-'use client';
-import React from 'react';
+"use client";
+import React from "react";
 
 export interface Card {
   id: string;
@@ -20,16 +20,18 @@ export default function CardView({ c, hidden = false, image }: { c: Card; hidden
 
   return (
     <div
-      className={`w-14 h-20 rounded-2xl border shadow grid place-items-center text-lg font-bold bg-white ${hidden ? "bg-neutral-200" : ""} overflow-hidden relative`}
+      className={`w-32 h-48 rounded-2xl border shadow grid place-items-center text-xl font-bold bg-white ${hidden ? "bg-neutral-200" : ""} overflow-hidden relative`}
       aria-label={`${hidden ? "carta oculta" : `${c.rank} de ${c.suit}`}`}
     >
       {hidden ? (
-        "🂠"
+      <img
+        src="/assets/cards/back.png"
+        alt="Dorso"
+        className="w-full h-full object-cover"
+      />
       ) : (
-        // if an image url is provided and it loads, show it; otherwise fallback to old render
         image && !imgError ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
+          <img
             src={image}
             alt={`${c.rank} de ${c.suit}`}
             className="w-full h-full object-cover"
@@ -37,9 +39,9 @@ export default function CardView({ c, hidden = false, image }: { c: Card; hidden
           />
         ) : (
           <div className="flex items-center gap-1">
-            <span>{prettyRank(c.rank)}</span>
+            <span>{c.rank}</span>
             <span className={c.suit === "♥" || c.suit === "♦" ? "text-red-600" : ""}>
-              {cardEmoji(c.suit)}
+              {c.suit}
             </span>
           </div>
         )
