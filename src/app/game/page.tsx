@@ -4,9 +4,11 @@ import { useState, useEffect, useRef } from "react";
 import { ChatPanel } from "./ChatPanel";
 import CyberpunkRainScene from "@/app/components/CyberpunkRainScene";
 import AnimatedCard from "../components/AnimatedCard";
+import { getUsername } from "../utils/settings"; // 👈 USAMOS ESTO
 
 type CardSimple = { name: string; suit?: string };
 type Player = { id: string; name: string; hp: number };
+type RoundResult = { player_id: string; total: number; hp: number };
 
 function calcularPuntos(hand: CardSimple[]) {
   let total = 0;
@@ -34,10 +36,13 @@ export default function GamePage() {
   const [players, setPlayers] = useState(2);
   const [connected, setConnected] = useState(0);
   const [roomId, setRoomId] = useState<string | null>(null);
-  const [playerName, setPlayerName] = useState("Operador_21");
+
+  // 👇 antes estaba "Operador_21" fijo
+  const [playerName, setPlayerName] = useState<string>("Operador_21");
+
   const [playerId, setPlayerId] = useState<string | null>(null);
   const [playersList, setPlayersList] = useState<Player[]>([]);
-  const [roundResults, setRoundResults] = useState<any[]>([]);
+  const [roundResults, setRoundResults] = useState<RoundResult[]>([]);
   const [roundFinished, setRoundFinished] = useState(false);
   const [myHp, setMyHp] = useState(60);
   const [hands, setHands] = useState<{ [id: string]: CardSimple[] }>({});
@@ -46,6 +51,16 @@ export default function GamePage() {
   const wsRef = useRef<WebSocket | null>(null);
   const pingTimerRef = useRef<number | null>(null);
   const PING_INTERVAL_MS = 10000;
+
+  // 👉 leer nombre desde localStorage/settings al montar
+  useEffect(() => {
+    try {
+      const username = getUsername();
+      setPlayerName(username);
+    } catch {
+      // si algo falla, se queda el por defecto
+    }
+  }, []);
 
   function cleanupPing() {
     if (pingTimerRef.current) {
@@ -76,7 +91,7 @@ export default function GamePage() {
   }
 
   function connectWS() {
-    const url = `wss://cards.titranx.com/ws/game?desired_players=${players}`;
+    const url = `ws://localhost:8000/ws/game?desired_players=${players}`;
     if (wsRef.current) {
       try {
         wsRef.current.close(1000, "reconnect");
@@ -109,9 +124,7 @@ export default function GamePage() {
           if (data.players_list) setPlayersList(data.players_list);
           setPhase("lobby");
           setRoundFinished(false);
-        }
-
-        else if (data.type === "start") {
+        } else if (data.type === "start") {
           setPhase("game");
           setHands({});
           setMyHand([]);
@@ -121,17 +134,11 @@ export default function GamePage() {
           setPlanted(false);
           if (data.player_id) setPlayerId(data.player_id);
           if (data.players_list) setPlayersList(data.players_list);
-        }
-
-        else if (data.type === "draw_result") {
+        } else if (data.type === "draw_result") {
           if (data.card) setMyHand((prev) => [...prev, data.card]);
-        }
-
-        else if (data.type === "update_hand") {
+        } else if (data.type === "update_hand") {
           if (data.hand) setMyHand(data.hand);
-        }
-
-        else if (data.type === "round_result") {
+        } else if (data.type === "round_result") {
           setRoundResults(data.results);
           setRoundFinished(true);
           setPlanted(false);
@@ -139,9 +146,7 @@ export default function GamePage() {
             setHands(data.hands);
             if (playerId && data.hands[playerId]) setMyHand(data.hands[playerId]);
           }
-        }
-
-        else if (data.type === "players_list") {
+        } else if (data.type === "players_list") {
           setPlayersList(data.players);
         }
       } catch {}
@@ -160,7 +165,11 @@ export default function GamePage() {
   }, [players]);
 
   function pedirCarta() {
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && !roundFinished) {
+    if (
+      wsRef.current &&
+      wsRef.current.readyState === WebSocket.OPEN &&
+      !roundFinished
+    ) {
       wsRef.current.send(
         JSON.stringify({ type: "action", action: { decision: "draw" } })
       );
@@ -168,7 +177,11 @@ export default function GamePage() {
   }
 
   function plantarse() {
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && !roundFinished) {
+    if (
+      wsRef.current &&
+      wsRef.current.readyState === WebSocket.OPEN &&
+      !roundFinished
+    ) {
       wsRef.current.send(
         JSON.stringify({ type: "action", action: { decision: "stand" } })
       );
@@ -197,7 +210,7 @@ export default function GamePage() {
   }
 
   // -----------------------------------------------------
-  // LOBBY — Futuristic Panel UI
+  // LOBBY
   // -----------------------------------------------------
   if (phase === "lobby") {
     return (
@@ -240,7 +253,9 @@ export default function GamePage() {
 
           <div className="flex flex-col gap-2 text-sm text-cyan-200/80 mt-5">
             {Array.from({ length: connected }).map((_, i) => (
-              <span key={i}>✔ {(i === 0 ? playerName : "Jugador " + (i + 1))}</span>
+              <span key={i}>
+                ✔ {i === 0 ? playerName : "Jugador " + (i + 1)}
+              </span>
             ))}
           </div>
 
@@ -255,7 +270,7 @@ export default function GamePage() {
   }
 
   // -----------------------------------------------------
-  // GAME — Futuristic Table UI
+  // GAME
   // -----------------------------------------------------
   return (
     <div className="relative min-h-screen w-screen font-body bg-[#050510] text-[#cfeaff] overflow-hidden flex flex-col items-center">
@@ -268,7 +283,6 @@ export default function GamePage() {
       </header>
 
       <main className="relative z-20 w-full max-w-7xl h-[85vh] mt-20 grid grid-cols-12 gap-6 px-4">
-        
         {/* LEFT PANEL */}
         <aside className="col-span-3 bg-[#07264b99] border border-cyan-400/30 backdrop-blur-lg rounded-2xl p-6 shadow-[0_0_20px_#009dff55] flex flex-col">
           <h2 className="text-xl text-cyan-200 mb-6 tracking-widest">
@@ -307,7 +321,9 @@ export default function GamePage() {
             <p className="text-3xl font-bold">
               {puntosMano}{" "}
               {puntosMano > 21 && (
-                <span className="text-red-400 animate-pulse">(Te pasaste!)</span>
+                <span className="text-red-400 animate-pulse">
+                  (Te pasaste!)
+                </span>
               )}
             </p>
           </div>
@@ -315,19 +331,26 @@ export default function GamePage() {
 
         {/* TABLE / ARENA */}
         <section className="col-span-6 bg-[#041925bb] border border-cyan-300/20 backdrop-blur-xl rounded-[40px] shadow-[0_0_35px_#009dff55] relative p-8 flex flex-col items-center justify-between">
-          
           <div className="text-center">
-            <strong className="text-cyan-300 text-xl tracking-widest">TU MANO</strong>
+            <strong className="text-cyan-300 text-xl tracking-widest">
+              TU MANO
+            </strong>
             {renderHandAnimated(myHand)}
           </div>
 
           <div className="mt-6 w-full text-cyan-300">
             {playersList.map((p) => (
               <div key={p.id} className="flex items-center gap-3 mb-3">
-                <span className={p.id === playerId ? "font-bold text-cyan-400" : ""}>
+                <span
+                  className={
+                    p.id === playerId ? "font-bold text-cyan-400" : ""
+                  }
+                >
                   {p.name} {p.id === playerId && "(yo)"}
                 </span>
-                {renderHandAnimated(p.id === playerId ? myHand : hands[p.id] || [])}
+                {renderHandAnimated(
+                  p.id === playerId ? myHand : hands[p.id] || []
+                )}
                 <span className="ml-auto text-cyan-200">{p.hp} HP</span>
               </div>
             ))}
@@ -335,24 +358,31 @@ export default function GamePage() {
 
           {roundResults.length > 0 && (
             <div className="w-full bg-cyan-900/40 border border-cyan-500/40 p-4 mt-6 rounded-xl shadow-[0_0_15px_#009dff66]">
-              <h3 className="text-cyan-300 text-xl mb-2">Resultado de Ronda</h3>
+              <h3 className="text-cyan-300 text-xl mb-2">
+                Resultado de Ronda
+              </h3>
               {roundResults.map((r) => (
                 <p key={r.player_id}>
-                  {(playersList.find((p) => p.id === r.player_id)?.name ||
-                    r.player_id)}
+                  {(
+                    playersList.find((p) => p.id === r.player_id)?.name ||
+                    r.player_id
+                  )}{" "}
                   : {r.total} pts — {r.hp} HP
                 </p>
               ))}
             </div>
           )}
-
         </section>
 
         {/* CHAT */}
         <aside className="col-span-3 bg-[#07264b80] border border-cyan-400/25 rounded-2xl p-4 shadow-[0_0_20px_#0077ff55] flex flex-col">
           <ChatPanel
             playerName={playerName}
-            t={{ noMessages: "Sin mensajes", typeMessage: "Escribe...", send: "Enviar" }}
+            t={{
+              noMessages: "Sin mensajes",
+              typeMessage: "Escribe...",
+              send: "Enviar",
+            }}
             ws={wsRef.current}
           />
         </aside>

@@ -1,7 +1,9 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
 
-export default function AnimatedCard({ card, index }: { card: any; index: number }) {
+type SimpleCard = { name: string; suit?: string };
+
+export default function AnimatedCard({ card, index }: { card: SimpleCard; index: number }) {
   const [revealed, setRevealed] = useState(false);
 
   useEffect(() => {
