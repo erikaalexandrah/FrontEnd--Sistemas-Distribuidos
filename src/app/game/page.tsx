@@ -105,12 +105,19 @@ const CardBack = ({ keyId }: { keyId: string }) => (
 
 export default function GamePage() {
   const [phase, setPhase] = useState<"lobby" | "game">("lobby");
+
+  // número de jugadores deseados (2,3,4)
   const [players, setPlayers] = useState(2);
+
+  // cuántos jugadores reporta el backend como conectados
   const [connected, setConnected] = useState(0);
+
   const [roomId, setRoomId] = useState<string | null>(null);
   const [playerName] = useState("Operador_21");
 
   const [playerId, setPlayerId] = useState<string | null>(null);
+  const playerIdRef = useRef<string | null>(null);
+
   const [playersList, setPlayersList] = useState<Player[]>([]);
 
   const [roundResults, setRoundResults] = useState<RoundResult[]>([]);
@@ -119,7 +126,6 @@ export default function GamePage() {
   const [myHp, setMyHp] = useState(60);
   const [hands, setHands] = useState<HandsDict>({});
   const [myHand, setMyHand] = useState<CardSimple[]>([]);
-
   const [planted, setPlanted] = useState(false);
 
   const wsRef = useRef<WebSocket | null>(null);
@@ -139,6 +145,7 @@ export default function GamePage() {
     setPhase("lobby");
     setRoomId(null);
     setPlayerId(null);
+    playerIdRef.current = null;
     setPlayersList([]);
     setRoundResults([]);
     setRoundFinished(false);
@@ -170,19 +177,24 @@ export default function GamePage() {
       return;
     }
 
-    // limpiar conexión previa (cerrada / rota)
-    disconnectWS();
+    // cerrar conexión previa si estaba medio colgada
+    if (wsRef.current) {
+      try {
+        wsRef.current.close(1000, "reconnect");
+      } catch {
+        // ignore
+      }
+      wsRef.current = null;
+    }
 
-    const ws = new WebSocket(
-      `wss://cards.titranx.com/ws/game?desired_players=${players}`
-    );
-
+    const url = `wss://cards.titranx.com/ws/game?desired_players=${players}`;
+    const ws = new WebSocket(url);
     wsRef.current = ws;
 
     ws.onopen = () => {
       setConnected(1);
 
-      // Enviar READY al conectar
+      // enviar READY al conectar (tu backend lo espera)
       try {
         ws.send(JSON.stringify({ type: "ready" }));
       } catch (e) {
@@ -227,6 +239,8 @@ export default function GamePage() {
           setPlanted(false);
 
           setPlayerId(data.player_id);
+          playerIdRef.current = data.player_id;
+
           setPlayersList(data.players_list);
           break;
         }
@@ -248,8 +262,16 @@ export default function GamePage() {
 
           setHands(data.hands);
 
-          if (playerId && data.hands[playerId]) {
-            setMyHand(data.hands[playerId]);
+          const myId = playerIdRef.current;
+          if (myId && data.hands[myId]) {
+            setMyHand(data.hands[myId]);
+          }
+
+          if (myId) {
+            const myResult = data.results.find((r) => r.player_id === myId);
+            if (myResult) {
+              setMyHp(myResult.hp);
+            }
           }
           break;
         }
@@ -262,13 +284,15 @@ export default function GamePage() {
     };
 
     ws.onerror = () => {
-      // podrías mostrar un toast aquí
+      // podrías loguear o mostrar algo
     };
 
     ws.onclose = () => {
       setConnected(0);
       cleanupPing();
-      // NO reseteo todo aquí para poder ver estado, pero podrías llamar resetGameState()
+      // no reseteo todo para poder ver información si se cerró por error
+      // si quieres reset completo, descomenta:
+      // resetGameState();
     };
   }
 
@@ -388,7 +412,7 @@ export default function GamePage() {
               Array.from({ length: connected }).map((_, i) => (
                 <span key={i} className="text-cyan-300 flex items-center gap-2">
                   ✔ {i === 0 ? playerName : "Jugador " + (i + 1)}
-                  <span className="text-green-400">(listo)</span>
+                  <span className="text-green-400">(conectado)</span>
                 </span>
               ))}
 
@@ -428,6 +452,8 @@ export default function GamePage() {
             <div className="mb-2 text-cyan-300">
               Puntos: {puntosMano} {puntosMano > 21 && "(Te pasaste!)"}
             </div>
+
+            <div className="mb-2 text-cyan-300">Tu HP: {myHp}</div>
 
             {mostrarPlantadoMsg && (
               <div className="my-4 text-lg font-bold text-green-400 animate-pulse">
