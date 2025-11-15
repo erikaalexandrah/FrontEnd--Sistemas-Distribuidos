@@ -1,18 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
 
-type CardSimple = {
-  name: string;
-  suit?: string;
-};
-
-export default function AnimatedCard({
-  card,
-  index
-}: {
-  card: CardSimple;
-  index: number;
-}) {
+export default function AnimatedCard({ card, index }: { card: any; index: number }) {
   const [revealed, setRevealed] = useState(false);
 
   useEffect(() => {
@@ -20,8 +9,8 @@ export default function AnimatedCard({
     return () => clearTimeout(timer);
   }, [index]);
 
-  const val = card?.name?.toLowerCase() ?? "";
-  const suit = card?.suit?.toLowerCase() ?? "";
+  const val = card?.name?.toLowerCase() || "";
+  const suit = card?.suit?.toLowerCase() || "";
   const imgName = `${val}-${suit}.png`;
   const realSrc = `/assets/cards/${imgName}`;
 
