@@ -17,48 +17,57 @@ export type Player = {
   hp: number;
 };
 
-// Mensajes entrantes del backend
-type WSMessage =
-  | {
-      type: "waiting";
-      players: number;
-      room_id: string;
-      players_list?: Player[];
-    }
-  | {
-      type: "start";
-      player_id: string;
-      players_list: Player[];
-    }
-  | {
-      type: "draw_result";
-      card: CardSimple;
-    }
-  | {
-      type: "update_hand";
-      hand: CardSimple[];
-    }
-  | {
-      type: "round_result";
-      results: RoundResult[];
-      hands: Record<string, CardSimple[]>;
-    }
-  | {
-      type: "players_list";
-      players: Player[];
-    };
-
-// Rounds
 type RoundResult = {
   player_id: string;
   total: number;
   hp: number;
 };
 
-// Hand dictionary
 type HandsDict = Record<string, CardSimple[]>;
 
-// ----------------- CODE -----------------
+type WaitingMessage = {
+  type: "waiting";
+  players: number;
+  room_id: string;
+  players_list?: Player[];
+};
+
+type StartMessage = {
+  type: "start";
+  player_id: string;
+  players_list: Player[];
+};
+
+type DrawResultMessage = {
+  type: "draw_result";
+  card: CardSimple;
+};
+
+type UpdateHandMessage = {
+  type: "update_hand";
+  hand: CardSimple[];
+};
+
+type RoundResultMessage = {
+  type: "round_result";
+  results: RoundResult[];
+  hands: HandsDict;
+};
+
+type PlayersListMessage = {
+  type: "players_list";
+  players: Player[];
+};
+
+type WSMessage =
+  | WaitingMessage
+  | StartMessage
+  | DrawResultMessage
+  | UpdateHandMessage
+  | RoundResultMessage
+  | PlayersListMessage;
+
+// ----------------- HELPERS -----------------
 
 function calcularPuntos(hand: CardSimple[]) {
   let total = 0;
@@ -92,8 +101,9 @@ const CardBack = ({ keyId }: { keyId: string }) => (
   />
 );
 
+// ----------------- COMPONENTE -----------------
+
 export default function GamePage() {
-  // ----------------- STATES -----------------
   const [phase, setPhase] = useState<"lobby" | "game">("lobby");
   const [players, setPlayers] = useState(2);
   const [connected, setConnected] = useState(0);
@@ -107,7 +117,6 @@ export default function GamePage() {
   const [roundFinished, setRoundFinished] = useState(false);
 
   const [myHp, setMyHp] = useState(60);
-
   const [hands, setHands] = useState<HandsDict>({});
   const [myHand, setMyHand] = useState<CardSimple[]>([]);
 
@@ -120,36 +129,48 @@ export default function GamePage() {
 
   // -------------- CLEANUP -----------------
   function cleanupPing() {
-    if (pingRef.current) {
-      clearInterval(pingRef.current);
+    if (pingRef.current !== null) {
+      window.clearInterval(pingRef.current);
       pingRef.current = null;
     }
+  }
+
+  function resetGameState() {
+    setPhase("lobby");
+    setRoomId(null);
+    setPlayerId(null);
+    setPlayersList([]);
+    setRoundResults([]);
+    setRoundFinished(false);
+    setMyHp(60);
+    setHands({});
+    setMyHand([]);
+    setPlanted(false);
   }
 
   function disconnectWS() {
     if (wsRef.current) {
       try {
         wsRef.current.close(1000, "manual disconnect");
-      } catch {}
+      } catch {
+        // ignore
+      }
       wsRef.current = null;
     }
 
     cleanupPing();
     setConnected(0);
-    setRoomId(null);
-    setPhase("lobby");
-    setPlayerId(null);
-    setPlayersList([]);
-    setMyHand([]);
-    setHands({});
-    setRoundResults([]);
-    setRoundFinished(false);
-    setMyHp(60);
-    setPlanted(false);
+    resetGameState();
   }
 
   // -------------- CONNECT -----------------
   function connectWS() {
+    // si ya hay un ws abierto, no crear otro
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      return;
+    }
+
+    // limpiar conexión previa (cerrada / rota)
     disconnectWS();
 
     const ws = new WebSocket(
@@ -161,7 +182,12 @@ export default function GamePage() {
     ws.onopen = () => {
       setConnected(1);
 
-      ws.send(JSON.stringify({ type: "ready" }));
+      // Enviar READY al conectar
+      try {
+        ws.send(JSON.stringify({ type: "ready" }));
+      } catch (e) {
+        console.error("Error enviando READY:", e);
+      }
 
       cleanupPing();
       pingRef.current = window.setInterval(() => {
@@ -171,26 +197,27 @@ export default function GamePage() {
       }, PING_INTERVAL_MS);
     };
 
-    ws.onmessage = (event) => {
+    ws.onmessage = (event: MessageEvent) => {
       if (typeof event.data !== "string") return;
 
       let data: WSMessage;
       try {
-        data = JSON.parse(event.data);
+        data = JSON.parse(event.data) as WSMessage;
       } catch {
+        console.warn("Mensaje WS no válido:", event.data);
         return;
       }
 
-      // ----------------- SWITCH -----------------
       switch (data.type) {
-        case "waiting":
+        case "waiting": {
           setConnected(data.players);
           setRoomId(data.room_id);
           if (data.players_list) setPlayersList(data.players_list);
           setPhase("lobby");
           break;
+        }
 
-        case "start":
+        case "start": {
           setPhase("game");
           setHands({});
           setMyHand([]);
@@ -202,16 +229,19 @@ export default function GamePage() {
           setPlayerId(data.player_id);
           setPlayersList(data.players_list);
           break;
+        }
 
-        case "draw_result":
+        case "draw_result": {
           setMyHand((prev) => [...prev, data.card]);
           break;
+        }
 
-        case "update_hand":
+        case "update_hand": {
           setMyHand(data.hand);
           break;
+        }
 
-        case "round_result":
+        case "round_result": {
           setRoundResults(data.results);
           setRoundFinished(true);
           setPlanted(false);
@@ -222,33 +252,36 @@ export default function GamePage() {
             setMyHand(data.hands[playerId]);
           }
           break;
+        }
 
-        case "players_list":
+        case "players_list": {
           setPlayersList(data.players);
           break;
+        }
       }
     };
 
-    ws.onerror = () => {};
+    ws.onerror = () => {
+      // podrías mostrar un toast aquí
+    };
+
     ws.onclose = () => {
       setConnected(0);
       cleanupPing();
+      // NO reseteo todo aquí para poder ver estado, pero podrías llamar resetGameState()
     };
   }
 
   // ------------- USE EFFECTS ---------------
   useEffect(() => {
-    return () => disconnectWS();
+    return () => {
+      disconnectWS();
+    };
   }, []);
-
-  useEffect(() => {
-    connectWS();
-  }, [players]);
 
   // ------------- PLAYER ACTIONS ------------
   function pedirCarta() {
-    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN || roundFinished)
-      return;
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN || roundFinished) return;
 
     wsRef.current.send(
       JSON.stringify({
@@ -259,8 +292,7 @@ export default function GamePage() {
   }
 
   function plantarse() {
-    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN || roundFinished)
-      return;
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN || roundFinished) return;
 
     wsRef.current.send(
       JSON.stringify({
@@ -317,7 +349,7 @@ export default function GamePage() {
   const puntosMano = calcularPuntos(myHand);
   const mostrarPlantadoMsg = planted && !roundFinished;
 
-  // ====================== RETURN LOBBY ======================
+  // ====================== LOBBY ======================
   if (phase === "lobby") {
     return (
       <div className="relative min-h-screen w-screen flex flex-col items-center justify-center font-body bg-[#050510] overflow-hidden">
@@ -361,7 +393,9 @@ export default function GamePage() {
               ))}
 
             {connected === 0 && (
-              <span className="text-xs text-cyan-400/60">No hay jugadores conectados aún</span>
+              <span className="text-xs text-cyan-400/60">
+                No hay jugadores conectados aún
+              </span>
             )}
           </div>
 
@@ -375,7 +409,7 @@ export default function GamePage() {
     );
   }
 
-  // ====================== RETURN GAME ======================
+  // ====================== GAME ======================
   return (
     <div className="relative min-h-screen w-screen flex flex-col items-center justify-center font-body bg-[#050510] text-[#cfeaff] overflow-hidden">
       <CyberpunkRainScene />
@@ -388,7 +422,6 @@ export default function GamePage() {
       <main className="relative z-10 flex flex-row items-stretch w-full max-w-6xl h-[80vh] mx-auto bg-[#0b0e1a]/80 border-2 border-[#25b6f8] rounded-3xl overflow-hidden animate-fadein">
         <div className="flex-1 flex flex-col justify-between p-6">
           <section className="rounded-2xl border border-cyan-700/40 bg-[#021425aa] p-6 flex-1 overflow-hidden">
-
             <strong>Tu mano:</strong>
             {renderHandSimple(myHand, false, "debug-hand")}
 
@@ -405,7 +438,11 @@ export default function GamePage() {
             <div className="mb-3 flex flex-col gap-3">
               {playersList.map((p) => (
                 <div key={p.id} className="flex items-center gap-3">
-                  <span className={p.id === playerId ? "font-bold text-cyan-400" : "text-cyan-200"}>
+                  <span
+                    className={
+                      p.id === playerId ? "font-bold text-cyan-400" : "text-cyan-200"
+                    }
+                  >
                     {p.name}
                     {p.id === playerId && " (yo)"}
                   </span>
