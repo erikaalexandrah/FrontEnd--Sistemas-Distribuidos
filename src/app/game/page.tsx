@@ -26,40 +26,49 @@ const MODIFIERS: ModifierInfo[] = [
   {
     key: "SC",
     label: "Sello de Coronación",
-    short: "Victoria inmediata",
+    short: "Victoria inmediata: ganas la partida al activarse.",
     img: "/assets/cards/SC.png",
   },
   {
     key: "VN",
     label: "Velo Neutralizador",
-    short: "Bloquea modificadores",
+    short: "Impide que el rival use modificadores la siguiente ronda.",
     img: "/assets/cards/VN.png",
   },
   {
     key: "NR",
     label: "Núcleo de Reposición",
-    short: "Cura si pierdes por poco",
+    short: "Si pierdes por ≤ 5 puntos, recuperas 5 HP.",
     img: "/assets/cards/NR.png",
   },
   {
     key: "EL",
     label: "Espejo Letal",
-    short: "Doble daño / castigo",
+    short: "Duplica el daño al rival; si pierdes tú, también se duplica.",
     img: "/assets/cards/EL.png",
   },
   {
     key: "PC",
     label: "Pulso Crítico",
-    short: "Daño extra con 21",
+    short: "Si logras exactamente 21, infliges 8 de daño adicional.",
     img: "/assets/cards/PC.png",
   },
   {
     key: "RT",
     label: "Relé de Tolerancia",
-    short: "Si te pasas, baja a 20",
+    short: "Si te pasas de 21, tu total se ajusta a 20.",
     img: "/assets/cards/RT.png",
   },
 ];
+
+const SPECIAL_LABEL: Record<string, string> = {
+  SC: "Sello de Coronación",
+  VN: "Velo Neutralizador",
+  NR: "Núcleo de Reposición",
+  EL: "Espejo Letal",
+  PC: "Pulso Crítico",
+  RT: "Relé de Tolerancia",
+};
 
 function calcularPuntos(hand: CardSimple[]) {
   let total = 0;
@@ -101,10 +110,13 @@ export default function GamePage() {
   const [chatEnabled, setChatEnabled] = useState(true);
   const [chatNotifications, setChatNotifications] = useState(true);
 
-  // NUEVO: modificador seleccionado para la próxima acción
+  // Leyenda: modificador seleccionado SOLO para mostrar descripción
   const [selectedModifier, setSelectedModifier] = useState<ModifierKey | null>(
     null
   );
+
+  // Mensaje de estado (plantado, carta especial, etc.)
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
   const pingTimerRef = useRef<number | null>(null);
@@ -149,10 +161,11 @@ export default function GamePage() {
     setMyHp(60);
     setPlanted(false);
     setSelectedModifier(null);
+    setStatusMessage(null);
   }
 
   function connectWS() {
-    const url = `ws://localhost:8000/ws/game?desired_players=${players}&name=${encodeURIComponent(
+    const url = `wss://cards.titranx.com/ws/game?desired_players=${players}&name=${encodeURIComponent(
       playerName
     )}`;
 
@@ -188,6 +201,7 @@ export default function GamePage() {
           if (data.players_list) setPlayersList(data.players_list);
           setPhase("lobby");
           setRoundFinished(false);
+          setStatusMessage(null);
         } else if (data.type === "start") {
           setPhase("game");
           setHands({});
@@ -197,17 +211,28 @@ export default function GamePage() {
           setRoundFinished(false);
           setPlanted(false);
           setSelectedModifier(null);
+          setStatusMessage("Nueva ronda. ¡Buena suerte!");
           if (data.player_id) setPlayerId(data.player_id);
           if (data.players_list) setPlayersList(data.players_list);
         } else if (data.type === "draw_result") {
-          if (data.card) setMyHand((prev) => [...prev, data.card]);
+          if (data.card) {
+            setMyHand((prev) => [...prev, data.card]);
+
+            const specialName = SPECIAL_LABEL[data.card.name];
+            if (specialName) {
+              setStatusMessage(
+                `Te salió la carta especial ${specialName} (${data.card.name}).`
+              );
+            } else {
+              setStatusMessage(null);
+            }
+          }
         } else if (data.type === "update_hand") {
           if (data.hand) setMyHand(data.hand);
         } else if (data.type === "round_result") {
           setRoundResults(data.results);
           setRoundFinished(true);
           setPlanted(false);
-          setSelectedModifier(null);
 
           if (data.hands) {
             setHands(data.hands);
@@ -224,17 +249,18 @@ export default function GamePage() {
             })
           );
 
-          // actualizar mi HP local (por si lo usas en otra parte)
+          // actualizar mi HP local
           if (playerId) {
             const me = data.results?.find(
               (r: RoundResult) => r.player_id === playerId
             );
             if (me) setMyHp(me.hp);
           }
+
+          setStatusMessage("Ronda resuelta.");
         } else if (data.type === "players_list") {
           setPlayersList(data.players);
         } else if (data.type === "game_over") {
-          // ejemplo básico: actualizamos HP y mostramos resultados en roundResults
           if (data.results) {
             setRoundResults(
               data.results.map((r: any) => ({
@@ -245,6 +271,7 @@ export default function GamePage() {
             );
           }
           setRoundFinished(true);
+          setStatusMessage("¡Partida terminada!");
         }
       } catch {
         // ignoramos errores de parseo
@@ -265,29 +292,27 @@ export default function GamePage() {
   }, [players]);
 
   // -----------------------------------------------------
-  // ACCIONES CON MODIFICADOR
+  // ACCIONES (YA NO ENVIAMOS MODIFICADOR)
   // -----------------------------------------------------
-
-  function buildActionPayload(decision: "draw" | "stand") {
-    // Adjuntamos el modificador si hay uno seleccionado
-    const action: any = { decision };
-    if (selectedModifier) {
-      action.modifier = selectedModifier;
-    }
-    return action;
-  }
 
   function pedirCarta() {
     if (
-      wsRef.current &&
-      wsRef.current.readyState === WebSocket.OPEN &&
-      !roundFinished
+      !wsRef.current ||
+      wsRef.current.readyState !== WebSocket.OPEN ||
+      roundFinished
     ) {
-      const action = buildActionPayload("draw");
-      wsRef.current.send(JSON.stringify({ type: "action", action }));
-      // Consumimos el modificador (solo se usa una vez)
-      if (selectedModifier) setSelectedModifier(null);
+      return;
     }
+
+    const puntosActuales = calcularPuntos(myHand);
+    if (puntosActuales > 21) {
+      setStatusMessage("Ya te pasaste de 21, no puedes pedir más cartas.");
+      return;
+    }
+
+    wsRef.current.send(
+      JSON.stringify({ type: "action", action: { decision: "draw" } })
+    );
   }
 
   function plantarse() {
@@ -296,10 +321,11 @@ export default function GamePage() {
       wsRef.current.readyState === WebSocket.OPEN &&
       !roundFinished
     ) {
-      const action = buildActionPayload("stand");
-      wsRef.current.send(JSON.stringify({ type: "action", action }));
+      wsRef.current.send(
+        JSON.stringify({ type: "action", action: { decision: "stand" } })
+      );
       setPlanted(true);
-      if (selectedModifier) setSelectedModifier(null);
+      setStatusMessage("Te plantaste. Esperando a los demás jugadores...");
     }
   }
 
@@ -309,14 +335,14 @@ export default function GamePage() {
     setHands({});
     setRoundFinished(false);
     setPlanted(false);
-    setSelectedModifier(null);
+    setStatusMessage("Nueva ronda en curso.");
   }
 
   const puntosMano = calcularPuntos(myHand);
 
   function renderHandAnimated(hand: CardSimple[]) {
     return (
-      <div className="flex gap-3 mt-3">
+      <div className="flex flex-wrap gap-3 mt-3">
         {hand.map((c, i) => (
           <AnimatedCard key={i} card={c} index={i} />
         ))}
@@ -325,6 +351,11 @@ export default function GamePage() {
   }
 
   function renderModifierSelector() {
+    const selected =
+      selectedModifier != null
+        ? MODIFIERS.find((m) => m.key === selectedModifier) || null
+        : null;
+
     return (
       <div className="mt-6">
         <h3 className="text-cyan-300 mb-3 text-sm tracking-widest">
@@ -348,7 +379,6 @@ export default function GamePage() {
                       ? "border-cyan-400 bg-cyan-500/20 shadow-[0_0_12px_#21d4fd]"
                       : "border-cyan-700/40 bg-[#031021aa]"
                   }`}
-                disabled={roundFinished}
               >
                 <div className="relative w-10 h-14 shrink-0 overflow-hidden rounded-md">
                   <Image
@@ -372,20 +402,17 @@ export default function GamePage() {
           })}
         </div>
 
-        {selectedModifier && (
-          <p className="mt-2 text-[11px] text-cyan-200/80">
-            Modificador seleccionado:{" "}
-            {
-              MODIFIERS.find((m) => m.key === selectedModifier)?.label ??
-              selectedModifier
-            }
-            . Se aplicará en tu siguiente acción.
-          </p>
+        {selected && (
+          <div className="mt-3 text-[11px] text-cyan-200/85 bg-[#021024aa] border border-cyan-500/40 rounded-lg p-2">
+            <p className="font-semibold text-cyan-100 mb-1">
+              {selected.label}
+            </p>
+            <p>{selected.short}</p>
+          </div>
         )}
       </div>
     );
   }
-
 
   // -----------------------------------------------------
   // LOBBY
@@ -475,7 +502,7 @@ export default function GamePage() {
             className="w-full px-6 py-4 bg-cyan-500/70 text-[#021425] text-lg font-bold rounded-xl 
               hover:brightness-110 active:scale-95 transition mb-3 shadow-[0_0_12px_#21d4fd]"
             onClick={pedirCarta}
-            disabled={roundFinished}
+            disabled={roundFinished || puntosMano > 21}
           >
             Pedir Carta
           </button>
@@ -508,9 +535,16 @@ export default function GamePage() {
                 </span>
               )}
             </p>
+
+            {/* Mensaje de estado (plantado, carta especial, etc.) */}
+            {statusMessage && (
+              <div className="mt-4 text-xs text-cyan-200 bg-[#021024aa] border border-cyan-400/40 rounded-lg p-3">
+                {statusMessage}
+              </div>
+            )}
           </div>
 
-          {/* Selector de modificadores */}
+          {/* Leyenda de modificadores */}
           {renderModifierSelector()}
         </aside>
 

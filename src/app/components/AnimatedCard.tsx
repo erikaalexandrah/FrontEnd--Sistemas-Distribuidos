@@ -1,47 +1,49 @@
-import { motion, AnimatePresence } from "framer-motion";
-import { useEffect, useState } from "react";
+"use client";
 
-type SimpleCard = { name: string; suit?: string };
+import Image from "next/image";
 
-export default function AnimatedCard({ card, index }: { card: SimpleCard; index: number }) {
-  const [revealed, setRevealed] = useState(false);
+type CardSimple = { name: string; suit?: string };
 
-  useEffect(() => {
-    const timer = setTimeout(() => setRevealed(true), 450 + index * 150);
-    return () => clearTimeout(timer);
-  }, [index]);
+type Props = {
+  card: CardSimple;
+  index: number;
+};
 
-  const val = card?.name?.toLowerCase() || "";
-  const suit = card?.suit?.toLowerCase() || "";
-  const imgName = `${val}-${suit}.png`;
-  const realSrc = `/assets/cards/${imgName}`;
+function getCardImage(card: CardSimple): string {
+  // Cartas especiales (SC, VN, NR, EL, PC, RT)
+  const specialKeys = ["SC", "VN", "NR", "EL", "PC", "RT"];
+  if (specialKeys.includes(card.name)) {
+    return `/assets/cards/${card.name}.png`;
+  }
+
+  // Cartas normales
+  if (!card.name) return "/assets/cards/back.png";
+
+  const name = card.name.toLowerCase(); // "a", "2", "j", etc.
+  const suit = (card.suit || "hearts").toLowerCase(); // "hearts", "spades", ...
+
+  // Tus archivos se llaman así: "a-hearts.png", "10-spades.png", etc.
+  return `/assets/cards/${name}-${suit}.png`;
+}
+
+export default function AnimatedCard({ card, index }: Props) {
+  const src = getCardImage(card);
 
   return (
-    <div className="relative w-[80px] h-[112px] [perspective:900px]">
-      <AnimatePresence>
-        {!revealed && (
-          <motion.img
-            key="back"
-            initial={{ x: -140, rotateY: 0, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ rotateY: 90, opacity: 0 }}
-            transition={{ duration: 0.45, ease: "easeOut" }}
-            src="/assets/cards/back.png"
-            className="absolute top-0 left-0 w-full h-full rounded-lg shadow-xl"
-          />
-        )}
-
-        {revealed && (
-          <motion.img
-            key="front"
-            initial={{ rotateY: -90, opacity: 0 }}
-            animate={{ rotateY: 0, opacity: 1 }}
-            transition={{ duration: 0.45, ease: "easeOut" }}
-            src={realSrc}
-            className="absolute top-0 left-0 w-full h-full rounded-lg shadow-xl bg-[#041926]"
-          />
-        )}
-      </AnimatePresence>
+    <div
+      className="relative w-16 h-24 sm:w-20 sm:h-28 rounded-xl shadow-[0_0_12px_rgba(0,200,255,0.5)] overflow-hidden
+                 transition-transform duration-200"
+      style={{
+        transform: `translateY(${index * 0}px)`, // fácil de tunear si quieres solaparlas
+      }}
+    >
+      <Image
+        src={src}
+        alt={card.name}
+        fill
+        className="object-contain"
+        sizes="80px"
+      />
     </div>
   );
 }
