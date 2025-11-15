@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { ChatPanel } from "./ChatPanel";
 import CyberpunkRainScene from "@/app/components/CyberpunkRainScene";
+
+/* =========================== HELPERS ============================ */
 
 type CardSimple = {
   name: string;
@@ -53,12 +55,14 @@ const CardBack = ({ keyId }: { keyId: string }) => (
   />
 );
 
+/* =========================== COMPONENT ============================ */
+
 export default function GamePage() {
   const [phase, setPhase] = useState<"lobby" | "game">("lobby");
   const [players, setPlayers] = useState(2);
   const [connected, setConnected] = useState(0);
   const [roomId, setRoomId] = useState<string | null>(null);
-  const [playerName, setPlayerName] = useState("Operador_21");
+  const [playerName] = useState("Operador_21");
   const [playerId, setPlayerId] = useState<string | null>(null);
   const [playersList, setPlayersList] = useState<Player[]>([]);
   const [roundResults, setRoundResults] = useState<RoundResult[]>([]);
@@ -73,22 +77,18 @@ export default function GamePage() {
 
   const PING_INTERVAL_MS = 10000;
 
-  function cleanupPing() {
+  /* ============================================================
+     CLEANUP HELPERS
+  ============================================================ */
+
+  const cleanupPing = () => {
     if (pingTimerRef.current) {
-      window.clearInterval(pingTimerRef.current);
+      clearInterval(pingTimerRef.current);
       pingTimerRef.current = null;
     }
-  }
+  };
 
-  function disconnectWS() {
-    if (wsRef.current) {
-      try {
-        wsRef.current.close(1000, "client disconnect");
-      } catch {}
-      wsRef.current = null;
-    }
-
-    cleanupPing();
+  const hardResetState = () => {
     setConnected(0);
     setRoomId(null);
     setPhase("lobby");
@@ -100,15 +100,22 @@ export default function GamePage() {
     setRoundFinished(false);
     setMyHp(60);
     setPlanted(false);
-  }
+  };
 
-  function connectWS() {
-    if (wsRef.current) {
-      try {
-        wsRef.current.close(1000, "reconnect");
-      } catch {}
-      wsRef.current = null;
-    }
+  const closeWS = useCallback((reason: string) => {
+    try {
+      wsRef.current?.close(1000, reason);
+    } catch {}
+    wsRef.current = null;
+    cleanupPing();
+  }, []);
+
+  /* ============================================================
+     CONNECT WEBSOCKET — SOLO SE LLAMA MANUALMENTE
+  ============================================================ */
+
+  const connectWS = useCallback(() => {
+    closeWS("reconnect");
 
     const url = `wss://cards.titranx.com/ws/game?desired_players=${players}`;
     const ws = new WebSocket(url);
@@ -116,12 +123,8 @@ export default function GamePage() {
 
     ws.onopen = () => {
       cleanupPing();
-
       pingTimerRef.current = window.setInterval(() => {
-        if (
-          wsRef.current &&
-          wsRef.current.readyState === WebSocket.OPEN
-        ) {
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
           wsRef.current.send("ping");
         }
       }, PING_INTERVAL_MS);
@@ -154,9 +157,7 @@ export default function GamePage() {
               break;
 
             case "draw_result":
-              if (data.card) {
-                setMyHand((prev) => [...prev, data.card]);
-              }
+              if (data.card) setMyHand((prev) => [...prev, data.card]);
               break;
 
             case "update_hand":
@@ -164,7 +165,7 @@ export default function GamePage() {
               break;
 
             case "round_result":
-              setRoundResults(data.results as RoundResult[]);
+              setRoundResults(data.results);
               setRoundFinished(true);
               setPlanted(false);
 
@@ -184,24 +185,39 @@ export default function GamePage() {
       } catch {}
     };
 
-    ws.onclose = () => disconnectWS();
-    ws.onerror = () => {};
-  }
+    ws.onerror = () => {
+      console.warn("WS error");
+    };
+
+    ws.onclose = (ev) => {
+      console.log("WS closed:", ev.code, ev.reason);
+
+      cleanupPing();
+
+      // SI el cierre fue normal (1000), no reconectar:
+      if (ev.code === 1000) return;
+
+      // SI el cierre NO fue normal → reconectar:
+      setTimeout(() => {
+        if (!wsRef.current) connectWS();
+      }, 1200);
+    };
+  }, [players, playerId, closeWS]);
+
+  /* ============================================================
+     COMPONENT UNMOUNT CLEANUP
+  ============================================================ */
 
   useEffect(() => {
-    return () => disconnectWS();
-  }, []);
+    return () => closeWS("unmount");
+  }, [closeWS]);
 
-  useEffect(() => {
-    if (wsRef.current) connectWS();
-  }, [players]);
+  /* ============================================================
+     ACTIONS
+  ============================================================ */
 
-  function pedirCarta() {
-    if (
-      wsRef.current &&
-      wsRef.current.readyState === WebSocket.OPEN &&
-      !roundFinished
-    ) {
+  const pedirCarta = () => {
+    if (wsRef.current?.readyState === WebSocket.OPEN && !roundFinished) {
       wsRef.current.send(
         JSON.stringify({
           type: "action",
@@ -209,14 +225,10 @@ export default function GamePage() {
         })
       );
     }
-  }
+  };
 
-  function plantarse() {
-    if (
-      wsRef.current &&
-      wsRef.current.readyState === WebSocket.OPEN &&
-      !roundFinished
-    ) {
+  const plantarse = () => {
+    if (wsRef.current?.readyState === WebSocket.OPEN && !roundFinished) {
       wsRef.current.send(
         JSON.stringify({
           type: "action",
@@ -225,21 +237,21 @@ export default function GamePage() {
       );
       setPlanted(true);
     }
-  }
+  };
 
-  function siguienteRonda() {
+  const siguienteRonda = () => {
     setRoundResults([]);
     setMyHand([]);
     setHands({});
     setRoundFinished(false);
     setPlanted(false);
-  }
+  };
 
-  function renderHandSimple(
+  const renderHandSimple = (
     hand: CardSimple[],
     hidden: boolean,
     pid: string
-  ) {
+  ) => {
     if (!hand.length) return null;
 
     if (hidden) {
@@ -265,20 +277,19 @@ export default function GamePage() {
               key={i}
               src={src}
               alt={imgName}
-              style={{
-                width: 80,
-                height: 112,
-                background: "#041926",
-              }}
+              style={{ width: 80, height: 112, background: "#041926" }}
             />
           );
         })}
       </div>
     );
-  }
+  };
 
   const puntosMano = calcularPuntos(myHand);
-  const mostrarPlantadoMsg = planted && !roundFinished;
+
+  /* ============================================================
+     LOBBY UI
+  ============================================================ */
 
   if (phase === "lobby") {
     return (
@@ -310,16 +321,14 @@ export default function GamePage() {
             ))}
           </div>
 
-          <div className="flex gap-3">
-            <button
-              onClick={() =>
-                wsRef.current ? disconnectWS() : connectWS()
-              }
-              className="px-6 py-3 bg-cyan-400/80 text-[#021425] font-bold rounded-md hover:brightness-110 active:scale-95 transition"
-            >
-              {wsRef.current ? "Desconectar" : "Conectar"}
-            </button>
-          </div>
+          <button
+            onClick={() =>
+              wsRef.current ? closeWS("manual") : connectWS()
+            }
+            className="px-6 py-3 bg-cyan-400/80 text-[#021425] font-bold rounded-md hover:brightness-110 active:scale-95 transition"
+          >
+            {wsRef.current ? "Desconectar" : "Conectar"}
+          </button>
 
           <div className="flex flex-col gap-2 text-sm text-cyan-100/80 mt-4">
             {Array.from({ length: connected }).map((_, i) => (
@@ -345,6 +354,10 @@ export default function GamePage() {
     );
   }
 
+  /* ============================================================
+     GAME UI
+  ============================================================ */
+
   return (
     <div className="relative min-h-screen w-screen flex flex-col items-center justify-center font-body bg-[#050510] text-[#cfeaff] overflow-hidden">
       <CyberpunkRainScene />
@@ -361,7 +374,7 @@ export default function GamePage() {
           <section className="rounded-2xl border border-cyan-700/40 bg-[#021425aa] p-6 flex-1 overflow-hidden">
             <div>
               <strong>Tu mano (debug):</strong>
-              {renderHandSimple(myHand, false, "debug-hand")}
+              {renderHandSimple(myHand, false, "myhand")}
             </div>
 
             <div className="mb-2 text-cyan-300">
@@ -369,7 +382,7 @@ export default function GamePage() {
               {puntosMano > 21 ? "(Te pasaste!)" : ""}
             </div>
 
-            {mostrarPlantadoMsg && (
+            {planted && !roundFinished && (
               <div className="my-4 text-lg font-bold text-green-400 animate-pulse">
                 TE HAS PLANTADO, ESPEREMOS A TU CONTRINCANTE...
               </div>
@@ -390,16 +403,12 @@ export default function GamePage() {
                   </span>
 
                   {renderHandSimple(
-                    p.id === playerId
-                      ? myHand
-                      : hands[p.id] || [],
+                    p.id === playerId ? myHand : hands[p.id] || [],
                     p.id !== playerId,
                     p.id
                   )}
 
-                  <span className="ml-3 text-cyan-300">
-                    {p.hp} HP
-                  </span>
+                  <span className="ml-3 text-cyan-300">{p.hp} HP</span>
                 </div>
               ))}
             </div>
@@ -436,8 +445,8 @@ export default function GamePage() {
 
                 {roundResults.map((r) => (
                   <div key={r.player_id}>
-                    {playersList.find((p) => p.id === r.player_id)
-                      ?.name || r.player_id}
+                    {playersList.find((p) => p.id === r.player_id)?.name ||
+                      r.player_id}
                     : {r.total} puntos, {r.hp} HP
                   </div>
                 ))}
