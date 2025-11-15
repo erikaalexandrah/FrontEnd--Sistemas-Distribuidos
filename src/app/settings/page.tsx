@@ -3,7 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import CyberpunkRainScene from "../components/CyberpunkRainScene";
-import { getSettings, saveSettings, DEFAULTS, type Settings, } from "../utils/settings";
+import {
+  getSettings,
+  saveSettings,
+  DEFAULTS,
+  type Settings,
+} from "../utils/settings";
 import { TRANSLATIONS } from "../utils/traductions/settings";
 import Section from "../components/Section";
 import Toggle from "../components/Toggle";
@@ -34,9 +39,6 @@ export default function SettingsPage() {
       setTimeout(() => setSaving(false), 500);
     }
   };
-
-  const setAudio = (k: keyof Settings["audio"]) => (v: number) =>
-    setSettings((s) => ({ ...s, audio: { ...s.audio, [k]: v } }));
 
   const canNotify = useMemo(() => settings.chatEnabled, [settings.chatEnabled]);
 
@@ -127,20 +129,17 @@ export default function SettingsPage() {
                 <Slider
                   label={t.volume}
                   value={settings.audio.master}
-                  onChange={(v) => setAudio("master")(v)}
-                />
-                <Slider
-                  label={t.music}
-                  value={settings.audio.music}
-                  onChange={(v) => setAudio("music")(v)}
-                />
-                <Slider
-                  label={t.sfx}
-                  value={settings.audio.sfx}
-                  onChange={(v) => setAudio("sfx")(v)}
+                  onChange={(v) =>
+                    setSettings((s) => ({
+                      ...s,
+                      audio: { ...s.audio, master: v },
+                    }))
+                  }
                 />
               </div>
-              <p className="text-[11px] text-[#8bc9ff88] mt-2">{t.audioHint}</p>
+              <p className="text-[11px] text-[#8bc9ff88] mt-2">
+                {t.audioHint}
+              </p>
             </Section>
 
             {/* CHAT */}
@@ -153,7 +152,9 @@ export default function SettingsPage() {
                     setSettings((s) => ({
                       ...s,
                       chatEnabled: checked,
-                      chatNotifications: checked ? s.chatNotifications : false,
+                      chatNotifications: checked
+                        ? s.chatNotifications
+                        : false,
                     }))
                   }
                 />
@@ -162,7 +163,10 @@ export default function SettingsPage() {
                   checked={settings.chatNotifications && canNotify}
                   disabled={!canNotify}
                   onChange={(checked) =>
-                    setSettings((s) => ({ ...s, chatNotifications: checked }))
+                    setSettings((s) => ({
+                      ...s,
+                      chatNotifications: checked,
+                    }))
                   }
                 />
               </div>
@@ -217,7 +221,9 @@ export default function SettingsPage() {
             <span className="w-4 h-4 rounded bg-[#14f2d066] mb-6" />
             <span className="border-t border-[#2adbf555] w-10 opacity-40" />
             <span className="mt-8 text-xs text-[#0deaff88] text-center">
-              user<br />prefs
+              user
+              <br />
+              prefs
             </span>
           </div>
           <div className="mb-6 text-cyan-800 text-[10px] font-mono opacity-60">
@@ -237,7 +243,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-
-
-
-
