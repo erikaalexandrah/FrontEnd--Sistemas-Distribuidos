@@ -1,0 +1,52 @@
+<!doctype html>
+<html>
+<body>
+  <h1>Test WS simple</h1>
+  <div>
+    <label>desired_players: <input id="dp" value="2" /></label>
+    <button id="connect">Connect</button>
+    <button id="close">Close</button>
+  </div>
+  <pre id="log" style="height:300px;overflow:auto;background:#111;color:#0f0;padding:8px;"></pre>
+  <script>
+    const log = (m) => {
+      console.log(m);
+      document.getElementById('log').textContent += m + '\n';
+    };
+    let ws = null;
+    document.getElementById('connect').onclick = () => {
+      const dp = document.getElementById('dp').value || '2';
+      if (ws) {
+        log('Already connected');
+        return;
+      }
+      const url = `ws://localhost:8000/ws/game?desired_players=${dp}`;
+      log('Connecting ' + url);
+      ws = new WebSocket(url);
+      ws.onopen = () => {
+        log('OPEN');
+        // start ping
+        ws._ping = setInterval(()=> {
+          try { ws.send('ping'); } catch(e) { log('ping err ' + e); }
+        }, 1000);
+      };
+      ws.onmessage = (ev) => {
+        log('MSG ' + ev.data);
+      };
+      ws.onclose = (ev) => {
+        log('CLOSE ' + ev.code + ' ' + ev.reason);
+        if (ws && ws._ping) clearInterval(ws._ping);
+        ws = null;
+      };
+      ws.onerror = (e) => {
+        log('ERROR ' + e);
+      };
+    };
+    document.getElementById('close').onclick = () => {
+      if (ws) {
+        ws.close(1000, 'manual');
+      }
+    };
+  </script>
+</body>
+</html>
