@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { ChatPanel } from "./ChatPanel";
 import CyberpunkRainScene from "@/app/components/CyberpunkRainScene";
 import AnimatedCard from "../components/AnimatedCard";
-import { getUsername } from "../utils/settings"; // 👈 USAMOS ESTO
+import { getSettings, getUsername } from "../utils/settings"; // 👈 usamos settings
 
 type CardSimple = { name: string; suit?: string };
 type Player = { id: string; name: string; hp: number };
@@ -37,9 +37,7 @@ export default function GamePage() {
   const [connected, setConnected] = useState(0);
   const [roomId, setRoomId] = useState<string | null>(null);
 
-  // 👇 antes estaba "Operador_21" fijo
   const [playerName, setPlayerName] = useState<string>("Operador_21");
-
   const [playerId, setPlayerId] = useState<string | null>(null);
   const [playersList, setPlayersList] = useState<Player[]>([]);
   const [roundResults, setRoundResults] = useState<RoundResult[]>([]);
@@ -48,17 +46,23 @@ export default function GamePage() {
   const [hands, setHands] = useState<{ [id: string]: CardSimple[] }>({});
   const [myHand, setMyHand] = useState<CardSimple[]>([]);
   const [planted, setPlanted] = useState(false);
+
+  const [chatEnabled, setChatEnabled] = useState(true);
+  const [chatNotifications, setChatNotifications] = useState(true);
+
   const wsRef = useRef<WebSocket | null>(null);
   const pingTimerRef = useRef<number | null>(null);
   const PING_INTERVAL_MS = 10000;
 
-  // 👉 leer nombre desde localStorage/settings al montar
+  // 👉 leer nombre + flags de chat desde settings
   useEffect(() => {
     try {
-      const username = getUsername();
-      setPlayerName(username);
+      const s = getSettings();
+      setPlayerName(getUsername());
+      setChatEnabled(s.chatEnabled);
+      setChatNotifications(s.chatNotifications);
     } catch {
-      // si algo falla, se queda el por defecto
+      setPlayerName(getUsername());
     }
   }, []);
 
@@ -91,7 +95,10 @@ export default function GamePage() {
   }
 
   function connectWS() {
-    const url = `ws://localhost:8000/ws/game?desired_players=${players}`;
+    const url = `ws://localhost:8000/ws/game?desired_players=${players}&name=${encodeURIComponent(
+      playerName
+    )}`;
+
     if (wsRef.current) {
       try {
         wsRef.current.close(1000, "reconnect");
@@ -162,6 +169,7 @@ export default function GamePage() {
 
   useEffect(() => {
     if (wsRef.current) connectWS();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [players]);
 
   function pedirCarta() {
@@ -252,12 +260,20 @@ export default function GamePage() {
           </button>
 
           <div className="flex flex-col gap-2 text-sm text-cyan-200/80 mt-5">
-            {Array.from({ length: connected }).map((_, i) => (
-              <span key={i}>
-                ✔ {i === 0 ? playerName : "Jugador " + (i + 1)}
-              </span>
-            ))}
+            {playersList.length > 0 ? (
+              playersList.map((p) => (
+                <span key={p.id}>✔ {p.name}</span>
+              ))
+            ) : (
+              // Fallback: mientras no llega players_list, usa el contador como antes
+              Array.from({ length: connected }).map((_, i) => (
+                <span key={i}>
+                  ✔ {i === 0 ? playerName : "Jugador " + (i + 1)}
+                </span>
+              ))
+            )}
           </div>
+
 
           {roomId && (
             <p className="text-xs text-cyan-500 mt-4 opacity-70">
@@ -384,6 +400,8 @@ export default function GamePage() {
               send: "Enviar",
             }}
             ws={wsRef.current}
+            chatEnabled={chatEnabled}
+            notificationsEnabled={chatNotifications}
           />
         </aside>
       </main>
