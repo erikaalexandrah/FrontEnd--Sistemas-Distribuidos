@@ -7,21 +7,25 @@ import CyberpunkRainScene from "@/app/components/CyberpunkRainScene";
 import AnimatedCard from "../components/AnimatedCard";
 import { getSettings, getUsername } from "../utils/settings";
 
-type CardSimple = { name: string; suit?: string };
+type CardSimple = {
+  name: string;
+  suit?: string;
+  specialtype?: string;
+  description?: string;
+};
+
 type Player = { id: string; name: string; hp: number };
 type RoundResult = { player_id: string; total: number; hp: number };
 
-// Claves de modificadores tal y como las espera el backend
 type ModifierKey = "SC" | "VN" | "NR" | "EL" | "PC" | "RT";
 
 type ModifierInfo = {
   key: ModifierKey;
   label: string;
   short: string;
-  img: string; // ruta del PNG en /public
+  img: string;
 };
 
-// Config para mostrar los modificadores en el UI
 const MODIFIERS: ModifierInfo[] = [
   {
     key: "SC",
@@ -93,40 +97,29 @@ function calcularPuntos(hand: CardSimple[]) {
 
 export default function GamePage() {
   const [phase, setPhase] = useState<"lobby" | "game">("lobby");
-  const [players, setPlayers] = useState(2);
-  const [connected, setConnected] = useState(0);
+  const [players, setPlayers] = useState<number>(2);
+  const [connected, setConnected] = useState<number>(0);
   const [roomId, setRoomId] = useState<string | null>(null);
-
   const [playerName, setPlayerName] = useState<string>("Operador_21");
   const [playerId, setPlayerId] = useState<string | null>(null);
   const [playersList, setPlayersList] = useState<Player[]>([]);
   const [roundResults, setRoundResults] = useState<RoundResult[]>([]);
-  const [roundFinished, setRoundFinished] = useState(false);
-  const [myHp, setMyHp] = useState(60);
-  const [hands, setHands] = useState<{ [id: string]: CardSimple[] }>({});
+  const [roundFinished, setRoundFinished] = useState<boolean>(false);
+  const [myHp, setMyHp] = useState<number>(60);
+  const [hands, setHands] = useState<Record<string, CardSimple[]>>({});
   const [myHand, setMyHand] = useState<CardSimple[]>([]);
-  const [planted, setPlanted] = useState(false);
-
-  const [chatEnabled, setChatEnabled] = useState(true);
-  const [chatNotifications, setChatNotifications] = useState(true);
-
-  // Leyenda: modificador seleccionado SOLO para mostrar descripción
-  const [selectedModifier, setSelectedModifier] = useState<ModifierKey | null>(
-    null
-  );
-
-  // Mensaje de estado (plantado, carta especial, etc.)
+  const [planted, setPlanted] = useState<boolean>(false);
+  const [chatEnabled, setChatEnabled] = useState<boolean>(true);
+  const [chatNotifications, setChatNotifications] = useState<boolean>(true);
+  const [selectedModifier, setSelectedModifier] = useState<ModifierKey | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
-
-  // Estado de fin de partida
-  const [gameOver, setGameOver] = useState(false);
+  const [gameOver, setGameOver] = useState<boolean>(false);
   const [didWin, setDidWin] = useState<boolean | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
   const pingTimerRef = useRef<number | null>(null);
   const PING_INTERVAL_MS = 10000;
 
-  // leer nombre + flags de chat desde settings
   useEffect(() => {
     try {
       const s = getSettings();
@@ -171,7 +164,7 @@ export default function GamePage() {
   }
 
   function connectWS() {
-    const url = `wss://cards.titranx.com/ws/game?desired_players=${players}&name=${encodeURIComponent(
+    const url = `ws://localhost:8000/ws/game?desired_players=${players}&name=${encodeURIComponent(
       playerName
     )}`;
 
@@ -196,7 +189,7 @@ export default function GamePage() {
       }, PING_INTERVAL_MS);
     };
 
-    ws.onmessage = (msgEvent) => {
+    ws.onmessage = (msgEvent: MessageEvent) => {
       try {
         const data = JSON.parse(msgEvent.data);
         if (!data) return;
@@ -226,12 +219,14 @@ export default function GamePage() {
           if (data.players_list) setPlayersList(data.players_list);
         } else if (data.type === "draw_result") {
           if (data.card) {
+            console.log("Carta recibida del backend:", data.card);
             setMyHand((prev) => [...prev, data.card]);
-
-            const specialName = SPECIAL_LABEL[data.card.name];
+            // Detecta por specialtype o name
+            const key: string = data.card.specialtype || data.card.name;
+            const specialName = SPECIAL_LABEL[key];
             if (specialName) {
               setStatusMessage(
-                `Te salió la carta especial ${specialName} (${data.card.name}).`
+                `Te salió la carta especial ${specialName} (${key}).`
               );
             } else {
               setStatusMessage(null);
@@ -249,7 +244,6 @@ export default function GamePage() {
             if (playerId && data.hands[playerId]) setMyHand(data.hands[playerId]);
           }
 
-          // actualizar HP de todos los jugadores en playersList
           setPlayersList((prev) =>
             prev.map((p) => {
               const r = data.results?.find(
@@ -259,7 +253,6 @@ export default function GamePage() {
             })
           );
 
-          // actualizar mi HP local
           if (playerId) {
             const me = data.results?.find(
               (r: RoundResult) => r.player_id === playerId
@@ -271,10 +264,9 @@ export default function GamePage() {
         } else if (data.type === "players_list") {
           setPlayersList(data.players);
         } else if (data.type === "game_over") {
-          // Guardamos resultados finales
           if (data.results) {
             setRoundResults(
-              data.results.map((r: any) => ({
+              data.results.map((r: RoundResult) => ({
                 player_id: r.player_id,
                 total: r.total ?? 0,
                 hp: r.hp,
@@ -282,7 +274,6 @@ export default function GamePage() {
             );
           }
 
-          // ¿Ganaste?
           if (data.winner_ids && playerId) {
             const winners: string[] = data.winner_ids;
             const win = winners.includes(playerId);
@@ -298,7 +289,6 @@ export default function GamePage() {
           setGameOver(true);
           setRoundFinished(true);
 
-          // Cerramos el WebSocket desde el front
           if (wsRef.current) {
             try {
               wsRef.current.close(1000, "game over");
@@ -308,15 +298,13 @@ export default function GamePage() {
           cleanupPing();
         }
       } catch {
-        // ignoramos errores de parseo
+        // Ignorar errores de parseo
       }
     };
 
     ws.onclose = () => {
-      // si se cerró por game over ya tenemos gameOver=true
       cleanupPing();
       if (!gameOver) {
-        // cierre "normal"
         disconnectWS();
       }
     };
@@ -331,10 +319,6 @@ export default function GamePage() {
     if (wsRef.current) connectWS();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [players]);
-
-  // -----------------------------------------------------
-  // ACCIONES (sin modificador hacia el backend)
-  // -----------------------------------------------------
 
   function pedirCarta() {
     if (
@@ -373,7 +357,6 @@ export default function GamePage() {
   }
 
   function siguienteRonda() {
-    // Sólo útil si el backend permite más rondas.
     if (gameOver) return;
 
     setRoundResults([]);
@@ -462,12 +445,8 @@ export default function GamePage() {
     disconnectWS();
   }
 
-  // -----------------------------------------------------
-  // LOBBY
-  // -----------------------------------------------------
   if (phase === "lobby") {
-    const isConnected =
-      wsRef.current && wsRef.current.readyState === WebSocket.OPEN;
+    const isConnected = !!(wsRef.current && wsRef.current.readyState === WebSocket.OPEN);
 
     return (
       <div className="relative min-h-screen w-screen flex flex-col items-center justify-center font-body bg-[#050510] overflow-hidden">
@@ -531,9 +510,6 @@ export default function GamePage() {
     );
   }
 
-  // -----------------------------------------------------
-  // GAME
-  // -----------------------------------------------------
   return (
     <div className="relative min-h-screen w-screen font-body bg-[#050510] text-[#cfeaff] overflow-hidden flex flex-col items-center">
       <CyberpunkRainScene />
@@ -544,7 +520,6 @@ export default function GamePage() {
         </span>
       </header>
 
-      {/* OVERLAY DE GAME OVER */}
       {gameOver && (
         <div className="fixed inset-0 z-40 bg-black/80 flex flex-col items-center justify-center">
           <h2 className="text-5xl sm:text-6xl font-title mb-6 drop-shadow-[0_0_25px_#21d4fd]">
@@ -570,12 +545,10 @@ export default function GamePage() {
       )}
 
       <main className="relative z-20 w-full max-w-7xl h-[85vh] mt-20 grid grid-cols-12 gap-6 px-4">
-        {/* LEFT PANEL */}
         <aside className="col-span-3 bg-[#07264b99] border border-cyan-400/30 backdrop-blur-lg rounded-2xl p-6 shadow-[0_0_20px_#009dff55] flex flex-col">
           <h2 className="text-xl text-cyan-200 mb-6 tracking-widest">
             CONTROL
           </h2>
-
           <button
             className="w-full px-6 py-4 bg-cyan-500/70 text-[#021425] text-lg font-bold rounded-xl 
               hover:brightness-110 active:scale-95 transition mb-3 shadow-[0_0_12px_#21d4fd]"
@@ -584,7 +557,6 @@ export default function GamePage() {
           >
             Pedir Carta
           </button>
-
           <button
             className="w-full px-6 py-4 bg-cyan-800/70 text-cyan-100 text-lg font-bold rounded-xl 
               hover:brightness-110 active:scale-95 transition mb-3"
@@ -593,7 +565,6 @@ export default function GamePage() {
           >
             Plantarse
           </button>
-
           <button
             className="w-full px-6 py-4 bg-green-600 text-white text-lg font-bold rounded-xl 
               hover:brightness-110 active:scale-95 transition shadow-[0_0_12px_#00ff99]"
@@ -602,7 +573,6 @@ export default function GamePage() {
           >
             Siguiente Ronda
           </button>
-
           <div className="flex-1 mt-6 border-t border-cyan-400/20 pt-4">
             <h3 className="text-cyan-300 mb-2">Puntos:</h3>
             <p className="text-3xl font-bold">
@@ -613,20 +583,14 @@ export default function GamePage() {
                 </span>
               )}
             </p>
-
-            {/* Mensaje de estado (plantado, carta especial, etc.) */}
             {statusMessage && (
               <div className="mt-4 text-xs text-cyan-200 bg-[#021024aa] border border-cyan-400/40 rounded-lg p-3">
                 {statusMessage}
               </div>
             )}
           </div>
-
-          {/* Leyenda de modificadores */}
           {renderModifierSelector()}
         </aside>
-
-        {/* TABLE / ARENA */}
         <section className="col-span-6 bg-[#041925bb] border border-cyan-300/20 backdrop-blur-xl rounded-[40px] shadow-[0_0_35px_#009dff55] relative p-8 flex flex-col items-center justify-between">
           <div className="text-center">
             <strong className="text-cyan-300 text-xl tracking-widest">
@@ -634,7 +598,6 @@ export default function GamePage() {
             </strong>
             {renderHandAnimated(myHand)}
           </div>
-
           <div className="mt-6 w-full text-cyan-300">
             {playersList.map((p) => (
               <div key={p.id} className="flex items-center gap-3 mb-3">
@@ -649,7 +612,6 @@ export default function GamePage() {
               </div>
             ))}
           </div>
-
           {roundResults.length > 0 && (
             <div className="w-full bg-cyan-900/40 border border-cyan-500/40 p-4 mt-6 rounded-xl shadow-[0_0_15px_#009dff66]">
               <h3 className="text-cyan-300 text-xl mb-2">
@@ -667,8 +629,6 @@ export default function GamePage() {
             </div>
           )}
         </section>
-
-        {/* CHAT */}
         <aside className="col-span-3 bg-[#07264b80] border border-cyan-400/25 rounded-2xl p-4 shadow-[0_0_20px_#0077ff55] flex flex-col">
           <ChatPanel
             playerName={playerName}
