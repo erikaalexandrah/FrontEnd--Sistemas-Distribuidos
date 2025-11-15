@@ -118,6 +118,10 @@ export default function GamePage() {
   // Mensaje de estado (plantado, carta especial, etc.)
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
+  // Estado de fin de partida
+  const [gameOver, setGameOver] = useState(false);
+  const [didWin, setDidWin] = useState<boolean | null>(null);
+
   const wsRef = useRef<WebSocket | null>(null);
   const pingTimerRef = useRef<number | null>(null);
   const PING_INTERVAL_MS = 10000;
@@ -162,6 +166,8 @@ export default function GamePage() {
     setPlanted(false);
     setSelectedModifier(null);
     setStatusMessage(null);
+    setGameOver(false);
+    setDidWin(null);
   }
 
   function connectWS() {
@@ -202,6 +208,8 @@ export default function GamePage() {
           setPhase("lobby");
           setRoundFinished(false);
           setStatusMessage(null);
+          setGameOver(false);
+          setDidWin(null);
         } else if (data.type === "start") {
           setPhase("game");
           setHands({});
@@ -211,6 +219,8 @@ export default function GamePage() {
           setRoundFinished(false);
           setPlanted(false);
           setSelectedModifier(null);
+          setGameOver(false);
+          setDidWin(null);
           setStatusMessage("Nueva ronda. ¡Buena suerte!");
           if (data.player_id) setPlayerId(data.player_id);
           if (data.players_list) setPlayersList(data.players_list);
@@ -261,6 +271,7 @@ export default function GamePage() {
         } else if (data.type === "players_list") {
           setPlayersList(data.players);
         } else if (data.type === "game_over") {
+          // Guardamos resultados finales
           if (data.results) {
             setRoundResults(
               data.results.map((r: any) => ({
@@ -270,15 +281,45 @@ export default function GamePage() {
               }))
             );
           }
+
+          // ¿Ganaste?
+          if (data.winner_ids && playerId) {
+            const winners: string[] = data.winner_ids;
+            const win = winners.includes(playerId);
+            setDidWin(win);
+            setStatusMessage(
+              win ? "¡Ganaste la partida!" : "Perdiste la partida."
+            );
+          } else {
+            setDidWin(null);
+            setStatusMessage("La partida ha terminado.");
+          }
+
+          setGameOver(true);
           setRoundFinished(true);
-          setStatusMessage("¡Partida terminada!");
+
+          // Cerramos el WebSocket desde el front
+          if (wsRef.current) {
+            try {
+              wsRef.current.close(1000, "game over");
+            } catch {}
+            wsRef.current = null;
+          }
+          cleanupPing();
         }
       } catch {
         // ignoramos errores de parseo
       }
     };
 
-    ws.onclose = () => disconnectWS();
+    ws.onclose = () => {
+      // si se cerró por game over ya tenemos gameOver=true
+      cleanupPing();
+      if (!gameOver) {
+        // cierre "normal"
+        disconnectWS();
+      }
+    };
     ws.onerror = () => {};
   }
 
@@ -292,14 +333,15 @@ export default function GamePage() {
   }, [players]);
 
   // -----------------------------------------------------
-  // ACCIONES (YA NO ENVIAMOS MODIFICADOR)
+  // ACCIONES (sin modificador hacia el backend)
   // -----------------------------------------------------
 
   function pedirCarta() {
     if (
       !wsRef.current ||
       wsRef.current.readyState !== WebSocket.OPEN ||
-      roundFinished
+      roundFinished ||
+      gameOver
     ) {
       return;
     }
@@ -319,7 +361,8 @@ export default function GamePage() {
     if (
       wsRef.current &&
       wsRef.current.readyState === WebSocket.OPEN &&
-      !roundFinished
+      !roundFinished &&
+      !gameOver
     ) {
       wsRef.current.send(
         JSON.stringify({ type: "action", action: { decision: "stand" } })
@@ -330,6 +373,9 @@ export default function GamePage() {
   }
 
   function siguienteRonda() {
+    // Sólo útil si el backend permite más rondas.
+    if (gameOver) return;
+
     setRoundResults([]);
     setMyHand([]);
     setHands({});
@@ -404,9 +450,7 @@ export default function GamePage() {
 
         {selected && (
           <div className="mt-3 text-[11px] text-cyan-200/85 bg-[#021024aa] border border-cyan-500/40 rounded-lg p-2">
-            <p className="font-semibold text-cyan-100 mb-1">
-              {selected.label}
-            </p>
+            <p className="font-semibold text-cyan-100 mb-1">{selected.label}</p>
             <p>{selected.short}</p>
           </div>
         )}
@@ -414,10 +458,17 @@ export default function GamePage() {
     );
   }
 
+  function handleBackToLobby() {
+    disconnectWS();
+  }
+
   // -----------------------------------------------------
   // LOBBY
   // -----------------------------------------------------
   if (phase === "lobby") {
+    const isConnected =
+      wsRef.current && wsRef.current.readyState === WebSocket.OPEN;
+
     return (
       <div className="relative min-h-screen w-screen flex flex-col items-center justify-center font-body bg-[#050510] overflow-hidden">
         <CyberpunkRainScene />
@@ -435,13 +486,15 @@ export default function GamePage() {
             {[2, 3, 4].map((n) => (
               <button
                 key={n}
-                onClick={() => setPlayers(n)}
+                onClick={() => !isConnected && setPlayers(n)}
+                disabled={isConnected}
                 className={`px-6 py-3 text-lg rounded-xl border transition-all duration-200
                 ${
                   n === players
                     ? "border-cyan-400 bg-cyan-500/30 shadow-[0_0_12px_#55eaff]"
                     : "border-cyan-700/40 hover:bg-cyan-500/10"
-                }`}
+                }
+                ${isConnected ? "opacity-50 cursor-not-allowed" : ""}`}
               >
                 {n} Jugadores
               </button>
@@ -491,6 +544,31 @@ export default function GamePage() {
         </span>
       </header>
 
+      {/* OVERLAY DE GAME OVER */}
+      {gameOver && (
+        <div className="fixed inset-0 z-40 bg-black/80 flex flex-col items-center justify-center">
+          <h2 className="text-5xl sm:text-6xl font-title mb-6 drop-shadow-[0_0_25px_#21d4fd]">
+            {didWin === null
+              ? "PARTIDA TERMINADA"
+              : didWin
+              ? "¡GANASTE!"
+              : "DERROTA"}
+          </h2>
+          {didWin !== null && (
+            <p className="mb-8 text-cyan-100 text-lg sm:text-2xl">
+              {didWin ? "Has dominado el Imperio de Apuestas." : "Otra ronda te espera."}
+            </p>
+          )}
+          <button
+            onClick={handleBackToLobby}
+            className="px-8 py-3 rounded-xl bg-cyan-400 text-[#021425] font-bold text-lg
+                       hover:brightness-110 active:scale-95 transition shadow-[0_0_18px_#21d4fd]"
+          >
+            Volver al lobby
+          </button>
+        </div>
+      )}
+
       <main className="relative z-20 w-full max-w-7xl h-[85vh] mt-20 grid grid-cols-12 gap-6 px-4">
         {/* LEFT PANEL */}
         <aside className="col-span-3 bg-[#07264b99] border border-cyan-400/30 backdrop-blur-lg rounded-2xl p-6 shadow-[0_0_20px_#009dff55] flex flex-col">
@@ -502,7 +580,7 @@ export default function GamePage() {
             className="w-full px-6 py-4 bg-cyan-500/70 text-[#021425] text-lg font-bold rounded-xl 
               hover:brightness-110 active:scale-95 transition mb-3 shadow-[0_0_12px_#21d4fd]"
             onClick={pedirCarta}
-            disabled={roundFinished || puntosMano > 21}
+            disabled={roundFinished || gameOver || puntosMano > 21}
           >
             Pedir Carta
           </button>
@@ -511,7 +589,7 @@ export default function GamePage() {
             className="w-full px-6 py-4 bg-cyan-800/70 text-cyan-100 text-lg font-bold rounded-xl 
               hover:brightness-110 active:scale-95 transition mb-3"
             onClick={plantarse}
-            disabled={roundFinished}
+            disabled={roundFinished || gameOver}
           >
             Plantarse
           </button>
@@ -520,7 +598,7 @@ export default function GamePage() {
             className="w-full px-6 py-4 bg-green-600 text-white text-lg font-bold rounded-xl 
               hover:brightness-110 active:scale-95 transition shadow-[0_0_12px_#00ff99]"
             onClick={siguienteRonda}
-            disabled={!roundFinished}
+            disabled={!roundFinished || gameOver}
           >
             Siguiente Ronda
           </button>

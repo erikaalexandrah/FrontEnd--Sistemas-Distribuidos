@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { motion } from "framer-motion";
 
 type CardSimple = { name: string; suit?: string };
 
@@ -30,12 +31,11 @@ export default function AnimatedCard({ card, index }: Props) {
   const src = getCardImage(card);
 
   return (
-    <div
-      className="relative w-16 h-24 sm:w-20 sm:h-28 rounded-xl shadow-[0_0_12px_rgba(0,200,255,0.5)] overflow-hidden
-                 transition-transform duration-200"
-      style={{
-        transform: `translateY(${index * 0}px)`, // fácil de tunear si quieres solaparlas
-      }}
+    <motion.div
+      className="relative w-16 h-24 sm:w-20 sm:h-28 rounded-xl shadow-[0_0_12px_rgba(0,200,255,0.5)] overflow-hidden"
+      initial={{ opacity: 0, y: -20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25, delay: index * 0.05 }}
     >
       <Image
         src={src}
@@ -44,6 +44,6 @@ export default function AnimatedCard({ card, index }: Props) {
         className="object-contain"
         sizes="80px"
       />
-    </div>
+    </motion.div>
   );
 }
