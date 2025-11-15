@@ -4,16 +4,61 @@ import { useState, useEffect, useRef } from "react";
 import { ChatPanel } from "./ChatPanel";
 import CyberpunkRainScene from "@/app/components/CyberpunkRainScene";
 
-type CardSimple = {
+// ----------------- TYPES -----------------
+
+export type CardSimple = {
   name: string;
   suit?: string;
 };
 
-type Player = {
+export type Player = {
   id: string;
   name: string;
   hp: number;
 };
+
+// Mensajes entrantes del backend
+type WSMessage =
+  | {
+      type: "waiting";
+      players: number;
+      room_id: string;
+      players_list?: Player[];
+    }
+  | {
+      type: "start";
+      player_id: string;
+      players_list: Player[];
+    }
+  | {
+      type: "draw_result";
+      card: CardSimple;
+    }
+  | {
+      type: "update_hand";
+      hand: CardSimple[];
+    }
+  | {
+      type: "round_result";
+      results: RoundResult[];
+      hands: Record<string, CardSimple[]>;
+    }
+  | {
+      type: "players_list";
+      players: Player[];
+    };
+
+// Rounds
+type RoundResult = {
+  player_id: string;
+  total: number;
+  hp: number;
+};
+
+// Hand dictionary
+type HandsDict = Record<string, CardSimple[]>;
+
+// ----------------- CODE -----------------
 
 function calcularPuntos(hand: CardSimple[]) {
   let total = 0;
@@ -48,26 +93,32 @@ const CardBack = ({ keyId }: { keyId: string }) => (
 );
 
 export default function GamePage() {
-  // Estados principales
+  // ----------------- STATES -----------------
   const [phase, setPhase] = useState<"lobby" | "game">("lobby");
   const [players, setPlayers] = useState(2);
   const [connected, setConnected] = useState(0);
   const [roomId, setRoomId] = useState<string | null>(null);
   const [playerName] = useState("Operador_21");
+
   const [playerId, setPlayerId] = useState<string | null>(null);
   const [playersList, setPlayersList] = useState<Player[]>([]);
-  const [roundResults, setRoundResults] = useState<any[]>([]);
+
+  const [roundResults, setRoundResults] = useState<RoundResult[]>([]);
   const [roundFinished, setRoundFinished] = useState(false);
+
   const [myHp, setMyHp] = useState(60);
-  const [hands, setHands] = useState<{ [id: string]: CardSimple[] }>({});
+
+  const [hands, setHands] = useState<HandsDict>({});
   const [myHand, setMyHand] = useState<CardSimple[]>([]);
+
   const [planted, setPlanted] = useState(false);
 
-  // WebSocket
   const wsRef = useRef<WebSocket | null>(null);
   const pingRef = useRef<number | null>(null);
+
   const PING_INTERVAL_MS = 10000;
 
+  // -------------- CLEANUP -----------------
   function cleanupPing() {
     if (pingRef.current) {
       clearInterval(pingRef.current);
@@ -97,6 +148,7 @@ export default function GamePage() {
     setPlanted(false);
   }
 
+  // -------------- CONNECT -----------------
   function connectWS() {
     disconnectWS();
 
@@ -109,12 +161,7 @@ export default function GamePage() {
     ws.onopen = () => {
       setConnected(1);
 
-      // -------- FIX: enviar READY automáticamente --------
-      try {
-        ws.send(JSON.stringify({ type: "ready" }));
-      } catch (e) {
-        console.error("Error enviando READY:", e);
-      }
+      ws.send(JSON.stringify({ type: "ready" }));
 
       cleanupPing();
       pingRef.current = window.setInterval(() => {
@@ -126,8 +173,15 @@ export default function GamePage() {
 
     ws.onmessage = (event) => {
       if (typeof event.data !== "string") return;
-      const data = JSON.parse(event.data);
 
+      let data: WSMessage;
+      try {
+        data = JSON.parse(event.data);
+      } catch {
+        return;
+      }
+
+      // ----------------- SWITCH -----------------
       switch (data.type) {
         case "waiting":
           setConnected(data.players);
@@ -145,16 +199,16 @@ export default function GamePage() {
           setRoundFinished(false);
           setPlanted(false);
 
-          if (data.player_id) setPlayerId(data.player_id);
-          if (data.players_list) setPlayersList(data.players_list);
+          setPlayerId(data.player_id);
+          setPlayersList(data.players_list);
           break;
 
         case "draw_result":
-          if (data.card) setMyHand((prev) => [...prev, data.card]);
+          setMyHand((prev) => [...prev, data.card]);
           break;
 
         case "update_hand":
-          if (data.hand) setMyHand(data.hand);
+          setMyHand(data.hand);
           break;
 
         case "round_result":
@@ -162,11 +216,10 @@ export default function GamePage() {
           setRoundFinished(true);
           setPlanted(false);
 
-          if (data.hands) {
-            setHands(data.hands);
-            if (playerId && data.hands[playerId]) {
-              setMyHand(data.hands[playerId]);
-            }
+          setHands(data.hands);
+
+          if (playerId && data.hands[playerId]) {
+            setMyHand(data.hands[playerId]);
           }
           break;
 
@@ -183,19 +236,19 @@ export default function GamePage() {
     };
   }
 
-  // Cleanup global
+  // ------------- USE EFFECTS ---------------
   useEffect(() => {
     return () => disconnectWS();
   }, []);
 
-  // Reconnect when players number changes
   useEffect(() => {
     connectWS();
   }, [players]);
 
-  // --- ACCIONES DEL JUGADOR ---
+  // ------------- PLAYER ACTIONS ------------
   function pedirCarta() {
-    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN || roundFinished) return;
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN || roundFinished)
+      return;
 
     wsRef.current.send(
       JSON.stringify({
@@ -206,7 +259,8 @@ export default function GamePage() {
   }
 
   function plantarse() {
-    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN || roundFinished) return;
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN || roundFinished)
+      return;
 
     wsRef.current.send(
       JSON.stringify({
@@ -226,6 +280,7 @@ export default function GamePage() {
     setPlanted(false);
   }
 
+  // ------------- UI HELPERS ----------------
   function renderHandSimple(hand: CardSimple[], hidden: boolean, pid: string) {
     if (!hand.length) return null;
 
@@ -262,7 +317,7 @@ export default function GamePage() {
   const puntosMano = calcularPuntos(myHand);
   const mostrarPlantadoMsg = planted && !roundFinished;
 
-  // ------------------- LOBBY -------------------
+  // ====================== RETURN LOBBY ======================
   if (phase === "lobby") {
     return (
       <div className="relative min-h-screen w-screen flex flex-col items-center justify-center font-body bg-[#050510] overflow-hidden">
@@ -320,7 +375,7 @@ export default function GamePage() {
     );
   }
 
-  // ------------------- GAME -------------------
+  // ====================== RETURN GAME ======================
   return (
     <div className="relative min-h-screen w-screen flex flex-col items-center justify-center font-body bg-[#050510] text-[#cfeaff] overflow-hidden">
       <CyberpunkRainScene />
