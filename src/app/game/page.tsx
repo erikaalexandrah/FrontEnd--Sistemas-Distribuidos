@@ -1,14 +1,65 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import Image from "next/image";
 import { ChatPanel } from "./ChatPanel";
 import CyberpunkRainScene from "@/app/components/CyberpunkRainScene";
 import AnimatedCard from "../components/AnimatedCard";
-import { getSettings, getUsername } from "../utils/settings"; // 👈 usamos settings
+import { getSettings, getUsername } from "../utils/settings";
 
 type CardSimple = { name: string; suit?: string };
 type Player = { id: string; name: string; hp: number };
 type RoundResult = { player_id: string; total: number; hp: number };
+
+// Claves de modificadores tal y como las espera el backend
+type ModifierKey = "SC" | "VN" | "NR" | "EL" | "PC" | "RT";
+
+type ModifierInfo = {
+  key: ModifierKey;
+  label: string;
+  short: string;
+  img: string; // ruta del PNG en /public
+};
+
+// Config para mostrar los modificadores en el UI
+const MODIFIERS: ModifierInfo[] = [
+  {
+    key: "SC",
+    label: "Sello de Coronación",
+    short: "Victoria inmediata",
+    img: "/assets/cards/SC.png",
+  },
+  {
+    key: "VN",
+    label: "Velo Neutralizador",
+    short: "Bloquea modificadores",
+    img: "/assets/cards/VN.png",
+  },
+  {
+    key: "NR",
+    label: "Núcleo de Reposición",
+    short: "Cura si pierdes por poco",
+    img: "/assets/cards/NR.png",
+  },
+  {
+    key: "EL",
+    label: "Espejo Letal",
+    short: "Doble daño / castigo",
+    img: "/assets/cards/EL.png",
+  },
+  {
+    key: "PC",
+    label: "Pulso Crítico",
+    short: "Daño extra con 21",
+    img: "/assets/cards/PC.png",
+  },
+  {
+    key: "RT",
+    label: "Relé de Tolerancia",
+    short: "Si te pasas, baja a 20",
+    img: "/assets/cards/RT.png",
+  },
+];
 
 function calcularPuntos(hand: CardSimple[]) {
   let total = 0;
@@ -50,11 +101,16 @@ export default function GamePage() {
   const [chatEnabled, setChatEnabled] = useState(true);
   const [chatNotifications, setChatNotifications] = useState(true);
 
+  // NUEVO: modificador seleccionado para la próxima acción
+  const [selectedModifier, setSelectedModifier] = useState<ModifierKey | null>(
+    null
+  );
+
   const wsRef = useRef<WebSocket | null>(null);
   const pingTimerRef = useRef<number | null>(null);
   const PING_INTERVAL_MS = 10000;
 
-  // 👉 leer nombre + flags de chat desde settings
+  // leer nombre + flags de chat desde settings
   useEffect(() => {
     try {
       const s = getSettings();
@@ -92,6 +148,7 @@ export default function GamePage() {
     setRoundFinished(false);
     setMyHp(60);
     setPlanted(false);
+    setSelectedModifier(null);
   }
 
   function connectWS() {
@@ -139,6 +196,7 @@ export default function GamePage() {
           setMyHp(60);
           setRoundFinished(false);
           setPlanted(false);
+          setSelectedModifier(null);
           if (data.player_id) setPlayerId(data.player_id);
           if (data.players_list) setPlayersList(data.players_list);
         } else if (data.type === "draw_result") {
@@ -149,14 +207,48 @@ export default function GamePage() {
           setRoundResults(data.results);
           setRoundFinished(true);
           setPlanted(false);
+          setSelectedModifier(null);
+
           if (data.hands) {
             setHands(data.hands);
             if (playerId && data.hands[playerId]) setMyHand(data.hands[playerId]);
           }
+
+          // actualizar HP de todos los jugadores en playersList
+          setPlayersList((prev) =>
+            prev.map((p) => {
+              const r = data.results?.find(
+                (rr: RoundResult) => rr.player_id === p.id
+              );
+              return r ? { ...p, hp: r.hp } : p;
+            })
+          );
+
+          // actualizar mi HP local (por si lo usas en otra parte)
+          if (playerId) {
+            const me = data.results?.find(
+              (r: RoundResult) => r.player_id === playerId
+            );
+            if (me) setMyHp(me.hp);
+          }
         } else if (data.type === "players_list") {
           setPlayersList(data.players);
+        } else if (data.type === "game_over") {
+          // ejemplo básico: actualizamos HP y mostramos resultados en roundResults
+          if (data.results) {
+            setRoundResults(
+              data.results.map((r: any) => ({
+                player_id: r.player_id,
+                total: r.total ?? 0,
+                hp: r.hp,
+              }))
+            );
+          }
+          setRoundFinished(true);
         }
-      } catch {}
+      } catch {
+        // ignoramos errores de parseo
+      }
     };
 
     ws.onclose = () => disconnectWS();
@@ -172,15 +264,29 @@ export default function GamePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [players]);
 
+  // -----------------------------------------------------
+  // ACCIONES CON MODIFICADOR
+  // -----------------------------------------------------
+
+  function buildActionPayload(decision: "draw" | "stand") {
+    // Adjuntamos el modificador si hay uno seleccionado
+    const action: any = { decision };
+    if (selectedModifier) {
+      action.modifier = selectedModifier;
+    }
+    return action;
+  }
+
   function pedirCarta() {
     if (
       wsRef.current &&
       wsRef.current.readyState === WebSocket.OPEN &&
       !roundFinished
     ) {
-      wsRef.current.send(
-        JSON.stringify({ type: "action", action: { decision: "draw" } })
-      );
+      const action = buildActionPayload("draw");
+      wsRef.current.send(JSON.stringify({ type: "action", action }));
+      // Consumimos el modificador (solo se usa una vez)
+      if (selectedModifier) setSelectedModifier(null);
     }
   }
 
@@ -190,10 +296,10 @@ export default function GamePage() {
       wsRef.current.readyState === WebSocket.OPEN &&
       !roundFinished
     ) {
-      wsRef.current.send(
-        JSON.stringify({ type: "action", action: { decision: "stand" } })
-      );
+      const action = buildActionPayload("stand");
+      wsRef.current.send(JSON.stringify({ type: "action", action }));
       setPlanted(true);
+      if (selectedModifier) setSelectedModifier(null);
     }
   }
 
@@ -203,6 +309,7 @@ export default function GamePage() {
     setHands({});
     setRoundFinished(false);
     setPlanted(false);
+    setSelectedModifier(null);
   }
 
   const puntosMano = calcularPuntos(myHand);
@@ -216,6 +323,69 @@ export default function GamePage() {
       </div>
     );
   }
+
+  function renderModifierSelector() {
+    return (
+      <div className="mt-6">
+        <h3 className="text-cyan-300 mb-3 text-sm tracking-widest">
+          MODIFICADORES
+        </h3>
+
+        <div className="grid grid-cols-2 gap-3">
+          {MODIFIERS.map((mod) => {
+            const isSelected = selectedModifier === mod.key;
+            return (
+              <button
+                key={mod.key}
+                type="button"
+                onClick={() =>
+                  setSelectedModifier((prev) => (prev === mod.key ? null : mod.key))
+                }
+                className={`relative flex items-start gap-2 rounded-xl border px-2 py-2 text-left
+                  transition hover:brightness-110 w-full
+                  ${
+                    isSelected
+                      ? "border-cyan-400 bg-cyan-500/20 shadow-[0_0_12px_#21d4fd]"
+                      : "border-cyan-700/40 bg-[#031021aa]"
+                  }`}
+                disabled={roundFinished}
+              >
+                <div className="relative w-10 h-14 shrink-0 overflow-hidden rounded-md">
+                  <Image
+                    src={mod.img}
+                    alt={mod.label}
+                    fill
+                    className="object-contain"
+                  />
+                </div>
+
+                <div className="flex flex-col overflow-hidden">
+                  <span className="font-semibold text-cyan-100 text-[11px] leading-tight truncate">
+                    {mod.label}
+                  </span>
+                  <span className="text-[10px] text-cyan-300/80 leading-tight overflow-hidden line-clamp-2">
+                    {mod.short}
+                  </span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {selectedModifier && (
+          <p className="mt-2 text-[11px] text-cyan-200/80">
+            Modificador seleccionado:{" "}
+            {
+              MODIFIERS.find((m) => m.key === selectedModifier)?.label ??
+              selectedModifier
+            }
+            . Se aplicará en tu siguiente acción.
+          </p>
+        )}
+      </div>
+    );
+  }
+
 
   // -----------------------------------------------------
   // LOBBY
@@ -261,11 +431,8 @@ export default function GamePage() {
 
           <div className="flex flex-col gap-2 text-sm text-cyan-200/80 mt-5">
             {playersList.length > 0 ? (
-              playersList.map((p) => (
-                <span key={p.id}>✔ {p.name}</span>
-              ))
+              playersList.map((p) => <span key={p.id}>✔ {p.name}</span>)
             ) : (
-              // Fallback: mientras no llega players_list, usa el contador como antes
               Array.from({ length: connected }).map((_, i) => (
                 <span key={i}>
                   ✔ {i === 0 ? playerName : "Jugador " + (i + 1)}
@@ -273,7 +440,6 @@ export default function GamePage() {
               ))
             )}
           </div>
-
 
           {roomId && (
             <p className="text-xs text-cyan-500 mt-4 opacity-70">
@@ -332,7 +498,7 @@ export default function GamePage() {
             Siguiente Ronda
           </button>
 
-          <div className="flex-1 mt-10 border-t border-cyan-400/20 pt-6">
+          <div className="flex-1 mt-6 border-t border-cyan-400/20 pt-4">
             <h3 className="text-cyan-300 mb-2">Puntos:</h3>
             <p className="text-3xl font-bold">
               {puntosMano}{" "}
@@ -343,6 +509,9 @@ export default function GamePage() {
               )}
             </p>
           </div>
+
+          {/* Selector de modificadores */}
+          {renderModifierSelector()}
         </aside>
 
         {/* TABLE / ARENA */}
@@ -364,9 +533,6 @@ export default function GamePage() {
                 >
                   {p.name} {p.id === playerId && "(yo)"}
                 </span>
-                {renderHandAnimated(
-                  p.id === playerId ? myHand : hands[p.id] || []
-                )}
                 <span className="ml-auto text-cyan-200">{p.hp} HP</span>
               </div>
             ))}
