@@ -15,12 +15,18 @@ type Player = {
   hp: number;
 };
 
+type RoundResult = {
+  player_id: string;
+  total: number;
+  hp: number;
+};
+
 function calcularPuntos(hand: CardSimple[]) {
   let total = 0;
   let aces = 0;
 
   for (const card of hand) {
-    const val = card.name.toLowerCase();
+    const val = card.name?.toLowerCase() ?? "";
 
     if (val === "a") {
       aces++;
@@ -55,10 +61,10 @@ export default function GamePage() {
   const [playerName, setPlayerName] = useState("Operador_21");
   const [playerId, setPlayerId] = useState<string | null>(null);
   const [playersList, setPlayersList] = useState<Player[]>([]);
-  const [roundResults, setRoundResults] = useState<any[]>([]);
+  const [roundResults, setRoundResults] = useState<RoundResult[]>([]);
   const [roundFinished, setRoundFinished] = useState(false);
   const [myHp, setMyHp] = useState(60);
-  const [hands, setHands] = useState<{ [id: string]: CardSimple[] }>({});
+  const [hands, setHands] = useState<Record<string, CardSimple[]>>({});
   const [myHand, setMyHand] = useState<CardSimple[]>([]);
   const [planted, setPlanted] = useState(false);
 
@@ -78,7 +84,7 @@ export default function GamePage() {
     if (wsRef.current) {
       try {
         wsRef.current.close(1000, "client disconnect");
-      } catch (e) {}
+      } catch {}
       wsRef.current = null;
     }
 
@@ -104,7 +110,7 @@ export default function GamePage() {
       wsRef.current = null;
     }
 
-    const url = `wss://cards.titranx.com/ws/game?desired_players=${players}`;
+    const url = `ws://localhost:8000/ws/game?desired_players=${players}`;
     const ws = new WebSocket(url);
     wsRef.current = ws;
 
@@ -112,14 +118,12 @@ export default function GamePage() {
       cleanupPing();
 
       pingTimerRef.current = window.setInterval(() => {
-        try {
-          if (
-            wsRef.current &&
-            wsRef.current.readyState === WebSocket.OPEN
-          ) {
-            wsRef.current.send("ping");
-          }
-        } catch (e) {}
+        if (
+          wsRef.current &&
+          wsRef.current.readyState === WebSocket.OPEN
+        ) {
+          wsRef.current.send("ping");
+        }
       }, PING_INTERVAL_MS);
     };
 
@@ -128,47 +132,56 @@ export default function GamePage() {
         if (typeof msgEvent.data === "string") {
           const data = JSON.parse(msgEvent.data);
 
-          if (data.type === "waiting") {
-            setRoomId(data.room_id);
-            setConnected(data.players);
-            if (data.players_list) setPlayersList(data.players_list);
-            setPhase("lobby");
-            setRoundFinished(false);
+          switch (data.type) {
+            case "waiting":
+              setRoomId(data.room_id);
+              setConnected(data.players);
+              if (data.players_list) setPlayersList(data.players_list);
+              setPhase("lobby");
+              setRoundFinished(false);
+              break;
 
-          } else if (data.type === "start") {
-            setPhase("game");
-            setHands({});
-            setMyHand([]);
-            setRoundResults([]);
-            setMyHp(60);
-            setRoundFinished(false);
-            setPlanted(false);
+            case "start":
+              setPhase("game");
+              setHands({});
+              setMyHand([]);
+              setRoundResults([]);
+              setMyHp(60);
+              setRoundFinished(false);
+              setPlanted(false);
+              if (data.player_id) setPlayerId(data.player_id);
+              if (data.players_list) setPlayersList(data.players_list);
+              break;
 
-            if (data.player_id) setPlayerId(data.player_id);
-            if (data.players_list) setPlayersList(data.players_list);
+            case "draw_result":
+              if (data.card) {
+                setMyHand((prev) => [...prev, data.card]);
+              }
+              break;
 
-          } else if (data.type === "draw_result") {
-            if (data.card) setMyHand((prev) => [...prev, data.card]);
+            case "update_hand":
+              if (data.hand) setMyHand(data.hand);
+              break;
 
-          } else if (data.type === "update_hand") {
-            if (data.hand) setMyHand(data.hand);
+            case "round_result":
+              setRoundResults(data.results as RoundResult[]);
+              setRoundFinished(true);
+              setPlanted(false);
 
-          } else if (data.type === "round_result") {
-            setRoundResults(data.results);
-            setRoundFinished(true);
-            setPlanted(false);
+              if (data.hands) {
+                setHands(data.hands);
+                if (playerId && data.hands[playerId]) {
+                  setMyHand(data.hands[playerId]);
+                }
+              }
+              break;
 
-            if (data.hands) {
-              setHands(data.hands);
-              if (playerId && data.hands[playerId])
-                setMyHand(data.hands[playerId]);
-            }
-
-          } else if (data.type === "players_list") {
-            setPlayersList(data.players);
+            case "players_list":
+              setPlayersList(data.players);
+              break;
           }
         }
-      } catch (err) {}
+      } catch {}
     };
 
     ws.onclose = () => disconnectWS();
@@ -190,7 +203,10 @@ export default function GamePage() {
       !roundFinished
     ) {
       wsRef.current.send(
-        JSON.stringify({ type: "action", action: { decision: "draw" } })
+        JSON.stringify({
+          type: "action",
+          action: { decision: "draw" },
+        })
       );
     }
   }
@@ -202,7 +218,10 @@ export default function GamePage() {
       !roundFinished
     ) {
       wsRef.current.send(
-        JSON.stringify({ type: "action", action: { decision: "stand" } })
+        JSON.stringify({
+          type: "action",
+          action: { decision: "stand" },
+        })
       );
       setPlanted(true);
     }
@@ -216,14 +235,18 @@ export default function GamePage() {
     setPlanted(false);
   }
 
-  function renderHandSimple(hand: CardSimple[], hidden: boolean, pid: string) {
+  function renderHandSimple(
+    hand: CardSimple[],
+    hidden: boolean,
+    pid: string
+  ) {
     if (!hand.length) return null;
 
     if (hidden) {
       return (
         <div className="flex gap-2">
           {hand.map((_, i) => (
-            <CardBack key={pid + "_" + i} keyId={""} />
+            <CardBack key={pid + "_" + i} keyId={`${pid}_${i}`} />
           ))}
         </div>
       );
@@ -232,8 +255,8 @@ export default function GamePage() {
     return (
       <div className="flex gap-2">
         {hand.map((c, i) => {
-          const val = c.name ? c.name.toLowerCase() : "";
-          const suit = (c.suit || "").toLowerCase();
+          const val = c.name?.toLowerCase() ?? "";
+          const suit = c.suit?.toLowerCase() ?? "";
           const imgName = `${val}-${suit}.png`;
           const src = `/assets/cards/${imgName}`;
 
@@ -413,9 +436,8 @@ export default function GamePage() {
 
                 {roundResults.map((r) => (
                   <div key={r.player_id}>
-                    {playersList.find(
-                      (p) => p.id === r.player_id
-                    )?.name || r.player_id}
+                    {playersList.find((p) => p.id === r.player_id)
+                      ?.name || r.player_id}
                     : {r.total} puntos, {r.hp} HP
                   </div>
                 ))}
