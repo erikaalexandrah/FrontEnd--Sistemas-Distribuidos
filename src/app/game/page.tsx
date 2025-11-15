@@ -164,7 +164,7 @@ export default function GamePage() {
   }
 
   function connectWS() {
-    const url = `ws://localhost:8000/ws/game?desired_players=${players}&name=${encodeURIComponent(
+    const url = `wss://cards.titranx.com/ws/game?desired_players=${players}&name=${encodeURIComponent(
       playerName
     )}`;
 
