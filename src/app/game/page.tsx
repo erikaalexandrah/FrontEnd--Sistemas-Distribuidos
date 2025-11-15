@@ -110,7 +110,7 @@ export default function GamePage() {
       wsRef.current = null;
     }
 
-    const url = `ws://localhost:8000/ws/game?desired_players=${players}`;
+    const url = `wss://cards.titranx.com/ws/game?desired_players=${players}`;
     const ws = new WebSocket(url);
     wsRef.current = ws;
 
