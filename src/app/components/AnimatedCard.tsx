@@ -1,14 +1,18 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
 
-/**
- * AnimatedCard
- * Carta animada estilo blackjack:
- * 1. Entra deslizando desde la izquierda mostrando back.png
- * 2. Hace flip en 3D
- * 3. Revela la carta real
- */
-export default function AnimatedCard({ card, index }: { card: any; index: number }) {
+type CardSimple = {
+  name: string;
+  suit?: string;
+};
+
+export default function AnimatedCard({
+  card,
+  index
+}: {
+  card: CardSimple;
+  index: number;
+}) {
   const [revealed, setRevealed] = useState(false);
 
   useEffect(() => {
@@ -16,8 +20,8 @@ export default function AnimatedCard({ card, index }: { card: any; index: number
     return () => clearTimeout(timer);
   }, [index]);
 
-  const val = card?.name?.toLowerCase() || "";
-  const suit = card?.suit?.toLowerCase() || "";
+  const val = card?.name?.toLowerCase() ?? "";
+  const suit = card?.suit?.toLowerCase() ?? "";
   const imgName = `${val}-${suit}.png`;
   const realSrc = `/assets/cards/${imgName}`;
 
