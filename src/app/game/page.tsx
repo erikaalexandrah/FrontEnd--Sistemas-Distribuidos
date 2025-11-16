@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { ChatPanel } from "./ChatPanel";
-import CyberpunkRainScene from "@/app/components/CyberpunkRainScene";
+// ⬇️ Eliminado CyberpunkRainScene
 import AnimatedCard from "../components/AnimatedCard";
 import { getSettings, getUsername } from "../utils/settings";
 
@@ -111,7 +111,9 @@ export default function GamePage() {
   const [planted, setPlanted] = useState<boolean>(false);
   const [chatEnabled, setChatEnabled] = useState<boolean>(true);
   const [chatNotifications, setChatNotifications] = useState<boolean>(true);
-  const [selectedModifier, setSelectedModifier] = useState<ModifierKey | null>(null);
+  const [selectedModifier, setSelectedModifier] = useState<ModifierKey | null>(
+    null
+  );
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [gameOver, setGameOver] = useState<boolean>(false);
   const [didWin, setDidWin] = useState<boolean | null>(null);
@@ -221,7 +223,6 @@ export default function GamePage() {
           if (data.card) {
             console.log("Carta recibida del backend:", data.card);
             setMyHand((prev) => [...prev, data.card]);
-            // Detecta por specialtype o name
             const key: string = data.card.specialtype || data.card.name;
             const specialName = SPECIAL_LABEL[key];
             if (specialName) {
@@ -369,16 +370,23 @@ export default function GamePage() {
 
   const puntosMano = calcularPuntos(myHand);
 
+  // CARTAS MÁS GRANDES
   function renderHandAnimated(hand: CardSimple[]) {
     return (
-      <div className="flex flex-wrap gap-3 mt-3">
+      <div className="flex flex-wrap gap-4 mt-4 justify-center">
         {hand.map((c, i) => (
-          <AnimatedCard key={i} card={c} index={i} />
+          <div
+            key={i}
+            className="transform scale-[1.15] origin-bottom transition-transform"
+          >
+            <AnimatedCard card={c} index={i} />
+          </div>
         ))}
       </div>
     );
   }
 
+  // SELECTOR DE MODIFICADORES, MÁS COMPACTO
   function renderModifierSelector() {
     const selected =
       selectedModifier != null
@@ -386,12 +394,12 @@ export default function GamePage() {
         : null;
 
     return (
-      <div className="mt-6">
-        <h3 className="text-cyan-300 mb-3 text-sm tracking-widest">
+      <div className="mt-4">
+        <h3 className="text-cyan-300 mb-2 text-xs tracking-widest">
           MODIFICADORES
         </h3>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-2">
           {MODIFIERS.map((mod) => {
             const isSelected = selectedModifier === mod.key;
             return (
@@ -409,7 +417,7 @@ export default function GamePage() {
                       : "border-cyan-700/40 bg-[#031021aa]"
                   }`}
               >
-                <div className="relative w-10 h-14 shrink-0 overflow-hidden rounded-md">
+                <div className="relative w-9 h-12 shrink-0 overflow-hidden rounded-md">
                   <Image
                     src={mod.img}
                     alt={mod.label}
@@ -419,10 +427,10 @@ export default function GamePage() {
                 </div>
 
                 <div className="flex flex-col overflow-hidden">
-                  <span className="font-semibold text-cyan-100 text-[11px] leading-tight truncate">
+                  <span className="font-semibold text-cyan-100 text-[10px] leading-tight truncate">
                     {mod.label}
                   </span>
-                  <span className="text-[10px] text-cyan-300/80 leading-tight overflow-hidden line-clamp-2">
+                  <span className="text-[9px] text-cyan-300/80 leading-tight overflow-hidden line-clamp-2">
                     {mod.short}
                   </span>
                 </div>
@@ -432,8 +440,10 @@ export default function GamePage() {
         </div>
 
         {selected && (
-          <div className="mt-3 text-[11px] text-cyan-200/85 bg-[#021024aa] border border-cyan-500/40 rounded-lg p-2">
-            <p className="font-semibold text-cyan-100 mb-1">{selected.label}</p>
+          <div className="mt-2 text-[10px] text-cyan-200/85 bg-[#021024aa] border border-cyan-500/40 rounded-lg p-2">
+            <p className="font-semibold text-cyan-100 mb-1">
+              {selected.label}
+            </p>
             <p>{selected.short}</p>
           </div>
         )}
@@ -446,12 +456,12 @@ export default function GamePage() {
   }
 
   if (phase === "lobby") {
-    const isConnected = !!(wsRef.current && wsRef.current.readyState === WebSocket.OPEN);
+    const isConnected =
+      !!(wsRef.current && wsRef.current.readyState === WebSocket.OPEN);
 
     return (
       <div className="relative min-h-screen w-screen flex flex-col items-center justify-center font-body bg-[#050510] overflow-hidden">
-        <CyberpunkRainScene />
-
+        {/* CyberpunkRainScene eliminado */}
         <h1 className="absolute top-5 text-4xl font-title text-cyan-300 drop-shadow-[0_0_10px_#21d4fd]">
           EMPIRE OF WAGERS
         </h1>
@@ -512,7 +522,7 @@ export default function GamePage() {
 
   return (
     <div className="relative min-h-screen w-screen font-body bg-[#050510] text-[#cfeaff] overflow-hidden flex flex-col items-center">
-      <CyberpunkRainScene />
+      {/* CyberpunkRainScene eliminado */}
 
       <header className="absolute top-4 left-6 z-30 flex gap-6 items-center">
         <span className="text-3xl font-title text-cyan-300 drop-shadow-[0_0_12px_#21d4fd]">
@@ -545,8 +555,9 @@ export default function GamePage() {
       )}
 
       <main className="relative z-20 w-full max-w-7xl h-[85vh] mt-20 grid grid-cols-12 gap-6 px-4">
-        <aside className="col-span-3 bg-[#07264b99] border border-cyan-400/30 backdrop-blur-lg rounded-2xl p-6 shadow-[0_0_20px_#009dff55] flex flex-col">
-          <h2 className="text-xl text-cyan-200 mb-6 tracking-widest">
+        {/* ASIDE IZQUIERDO: AHORA CON SCROLL SI HACE FALTA */}
+        <aside className="col-span-3 bg-[#07264b99] border border-cyan-400/30 backdrop-blur-lg rounded-2xl p-4 md:p-6 shadow-[0_0_20px_#009dff55] flex flex-col overflow-y-auto max-h-[85vh]">
+          <h2 className="text-xl text-cyan-200 mb-4 tracking-widest">
             CONTROL
           </h2>
           <button
@@ -573,8 +584,8 @@ export default function GamePage() {
           >
             Siguiente Ronda
           </button>
-          <div className="flex-1 mt-6 border-t border-cyan-400/20 pt-4">
-            <h3 className="text-cyan-300 mb-2">Puntos:</h3>
+          <div className="flex-1 mt-4 border-t border-cyan-400/20 pt-3">
+            <h3 className="text-cyan-300 mb-1 text-sm">Puntos:</h3>
             <p className="text-3xl font-bold">
               {puntosMano}{" "}
               {puntosMano > 21 && (
@@ -584,13 +595,14 @@ export default function GamePage() {
               )}
             </p>
             {statusMessage && (
-              <div className="mt-4 text-xs text-cyan-200 bg-[#021024aa] border border-cyan-400/40 rounded-lg p-3">
+              <div className="mt-3 text-xs text-cyan-200 bg-[#021024aa] border border-cyan-400/40 rounded-lg p-3">
                 {statusMessage}
               </div>
             )}
           </div>
           {renderModifierSelector()}
         </aside>
+
         <section className="col-span-6 bg-[#041925bb] border border-cyan-300/20 backdrop-blur-xl rounded-[40px] shadow-[0_0_35px_#009dff55] relative p-8 flex flex-col items-center justify-between">
           <div className="text-center">
             <strong className="text-cyan-300 text-xl tracking-widest">
@@ -629,6 +641,7 @@ export default function GamePage() {
             </div>
           )}
         </section>
+
         <aside className="col-span-3 bg-[#07264b80] border border-cyan-400/25 rounded-2xl p-4 shadow-[0_0_20px_#0077ff55] flex flex-col">
           <ChatPanel
             playerName={playerName}

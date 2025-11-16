@@ -12,7 +12,7 @@ export const INSTRUCTIONS_TRANSLATIONS = {
       `<p><strong>Empire of Wagers</strong> es un juego de cartas inspirado en el blackjack clásico, diseñado para partidas cortas y dinámicas donde la estrategia y el azar se combinan.</p>`,
       `<p><strong>Objetivo principal:</strong> acercarte lo más posible al valor de <strong>21</strong> sin superarlo. Si te pasas, pierdes la ronda automáticamente. El oponente también intentará acercarse a 21.</p>`,
       `<p><strong>Sistema de vida:</strong> cada jugador comienza con <strong>60 puntos de vida (HP)</strong>. Cada vez que pierdes una ronda, pierdes una cantidad de vida igual al valor total de tu mano. Por ejemplo: si terminas con 24 puntos, pierdes 24 de vida. Si terminas con 18 y el oponente tiene 20, pierdes 18. En caso de empate, nadie pierde vida.</p>`,
-      `<p><strong>Duración estimada:</strong> una partida típica dura entre 3 y 4 rondas, dependiendo de las decisiones del jugador y del uso de los modificadores.</p>`,
+      `<p><strong>Duración estimada:</strong> una partida típica dura entre 3 y 4 rondas, dependiendo de las decisiones del jugador y del uso de las cartas especiales.</p>`,
       `<p><strong>Derrota:</strong> si tu vida llega a 0, pierdes inmediatamente. <strong>Victoria:</strong> ganas cuando todos los oponentes llegan a 0 HP.</p>`,
       `<h2 class='text-lg md:text-xl font-title text-[#9edfff] font-bold mt-2'>Reglas básicas del turno</h2>
       <ol class='list-decimal list-inside space-y-1 text-sm'>
@@ -22,24 +22,20 @@ export const INSTRUCTIONS_TRANSLATIONS = {
         <li>Una vez que ambos confirman su decisión, se revelan los totales.</li>
         <li>En caso de empate, ninguno pierde vida.</li>
       </ol>`,
-      `<h2 class='text-lg md:text-xl font-title text-[#9edfff] font-bold mt-2'>Modificadores del juego (10 en total)</h2>
+      `<h2 class='text-lg md:text-xl font-title text-[#9edfff] font-bold mt-2'>Cartas especiales / Modificadores (6 en total)</h2>
       <ol class='list-decimal list-inside space-y-1 text-sm'>
-        <li><strong>Suerte del Novato:</strong> una vez por partida, si tu total supera 21, se ajusta automáticamente a 20.</li>
-        <li><strong>Robo Preciso:</strong> la siguiente carta tendrá valor fijo entre 2 y 6.</li>
-        <li><strong>Escudo de Hierro:</strong> reduce el daño recibido en un 50% la próxima derrota.</li>
-        <li><strong>Doble Riesgo:</strong> duplica tu daño potencial, pero si pierdes también se duplica.</li>
-        <li><strong>Golpe Crítico:</strong> si logras exactamente 21, infliges 8 de daño adicional.</li>
-        <li><strong>Reinicio de Mano:</strong> puedes cambiar todas tus cartas una vez por partida.</li>
-        <li><strong>Vista Parcial:</strong> permite ver una carta aleatoria del oponente una vez por ronda.</li>
-        <li><strong>Recuperación:</strong> si pierdes por ≤5 puntos, recuperas 5 HP.</li>
-        <li><strong>Bloqueo de Efecto:</strong> impide que el oponente use su modificador siguiente ronda.</li>
-        <li><strong>Última Apuesta:</strong> si tienes ≤15 HP, inicias cada mano con un As extra.</li>
+        <li><strong>Sello de Coronación (SC):</strong> carta de victoria absoluta. Al activarse su efecto, ganas inmediatamente la partida, sin importar los puntos de vida restantes.</li>
+        <li><strong>Velo Neutralizador (VN):</strong> crea un bloqueo táctico. Impide que el rival utilice cartas especiales o modificadores durante la siguiente ronda.</li>
+        <li><strong>Núcleo de Reposición (NR):</strong> efecto defensivo. Si pierdes una ronda por una diferencia de ≤ 5 puntos, recuperas <strong>5 HP</strong> al final de esa ronda.</li>
+        <li><strong>Espejo Letal (EL):</strong> efecto de riesgo compartido. El daño que infliges al rival se duplica, pero si eres tú quien pierde esa ronda, el daño que recibes también se duplica.</li>
+        <li><strong>Pulso Crítico (PC):</strong> carta orientada al “21 perfecto”. Si tu total es exactamente <strong>21</strong>, infliges <strong>8 puntos de daño adicional</strong> al oponente.</li>
+        <li><strong>Relé de Tolerancia (RT):</strong> red de seguridad contra el exceso. Si tu total supera 21, se ajusta automáticamente a <strong>20</strong> cuando este efecto está activo.</li>
       </ol>`,
       `<h2 class='text-lg md:text-xl font-title text-[#8bb3ff] font-bold mt-2'>Consejos estratégicos</h2>
       <ul class='list-disc list-inside space-y-1 text-sm'>
         <li>Plantarte a tiempo es más valioso que buscar siempre el 21.</li>
-        <li>Usa tus modificadores estratégicamente.</li>
-        <li>Observa los patrones de tus oponentes antes de arriesgarte.</li>
+        <li>Usa tus cartas especiales en momentos clave: cambiar una sola ronda puede decidir toda la partida.</li>
+        <li>Observa los patrones de tus oponentes antes de arriesgarte con modificadores de alto riesgo como Espejo Letal.</li>
       </ul>`,
       `<h2 class='text-lg md:text-xl font-title text-[#9edfff] font-bold mt-2'>Resumen general</h2>
       <ul class='list-inside space-y-1 text-sm'>
@@ -47,7 +43,7 @@ export const INSTRUCTIONS_TRANSLATIONS = {
         <li>Vida inicial: 60 HP</li>
         <li>Pierdes vida igual al valor de tu mano si pierdes.</li>
         <li>Duración media: 3–4 rondas.</li>
-        <li>No se gana vida por victoria directa (solo modificadores).</li>
+        <li>No se gana vida por victoria directa (solo mediante efectos de cartas como Núcleo de Reposición).</li>
       </ul>
       <p class='mt-2 italic text-sm'>*Empire of Wagers* combina probabilidad, riesgo y cálculo rápido.</p>`
     ]
@@ -63,37 +59,33 @@ export const INSTRUCTIONS_TRANSLATIONS = {
     secureNode: "secure node: encrypted channel ∎",
     fullText: [
       `<h1 class='text-2xl md:text-3xl font-title uppercase font-bold tracking-[0.08em] text-transparent bg-clip-text bg-gradient-to-r from-[#25b6f8] via-[#55d9fb] to-[#bbfafe] mb-2'>Usage Instructions and Game Rules</h1>`,
-      `<p><strong>Empire of Wagers</strong> is a card game inspired by classic blackjack, designed for short and dynamic matches where strategy and luck intertwine.</p>`,
-      `<p><strong>Main objective:</strong> get as close as possible to <strong>21</strong> without going over. If you exceed it, you lose the round automatically. The opponent will also try to reach 21.</p>`,
-      `<p><strong>Life system:</strong> each player starts with <strong>60 health points (HP)</strong>. Every time you lose a round, you lose life equal to the total value of your hand. For example: if you end with 24 points, you lose 24 HP. If you end with 18 and the opponent has 20, you lose 18 HP. In case of a tie, no one loses life.</p>`,
-      `<p><strong>Estimated duration:</strong> a typical match lasts between 3 and 4 rounds, depending on decisions and modifier usage.</p>`,
+      `<p><strong>Empire of Wagers</strong> is a card game inspired by classic blackjack, designed for short, dynamic matches where strategy and luck intertwine.</p>`,
+      `<p><strong>Main objective:</strong> get as close as possible to <strong>21</strong> without going over. If you exceed 21, you automatically lose the round. Your opponent is trying to do the same.</p>`,
+      `<p><strong>Life system:</strong> each player starts with <strong>60 health points (HP)</strong>. Every time you lose a round, you lose HP equal to the total value of your hand. For example: if you end with 24 points, you lose 24 HP. If you end with 18 and your opponent has 20, you lose 18 HP. In case of a tie, no HP is lost.</p>`,
+      `<p><strong>Estimated duration:</strong> a typical match lasts between 3 and 4 rounds, depending on decisions and the use of special cards.</p>`,
       `<p><strong>Defeat:</strong> if your HP reaches 0, you lose immediately. <strong>Victory:</strong> you win when all opponents reach 0 HP.</p>`,
       `<h2 class='text-lg md:text-xl font-title text-[#9edfff] font-bold mt-2'>Basic Turn Rules</h2>
       <ol class='list-decimal list-inside space-y-1 text-sm'>
         <li>Each player starts with two cards visible only to themselves.</li>
-        <li>During your turn, choose to <strong>Hit</strong> (draw) or <strong>Stand</strong>.</li>
+        <li>On your turn, you choose to <strong>Hit</strong> (draw) or <strong>Stand</strong>.</li>
         <li>Decisions remain secret until both players have acted.</li>
         <li>Once confirmed, totals are revealed and compared.</li>
         <li>In case of a tie, no HP is lost.</li>
       </ol>`,
-      `<h2 class='text-lg md:text-xl font-title text-[#9edfff] font-bold mt-2'>Game Modifiers (10 total)</h2>
+      `<h2 class='text-lg md:text-xl font-title text-[#9edfff] font-bold mt-2'>Special Cards / Modifiers (6 total)</h2>
       <ol class='list-decimal list-inside space-y-1 text-sm'>
-        <li><strong>Beginner’s Luck:</strong> once per match, if your total exceeds 21, it automatically adjusts to 20.</li>
-        <li><strong>Precise Draw:</strong> the next card you draw will have a fixed value between 2 and 6.</li>
-        <li><strong>Iron Shield:</strong> reduces incoming damage by 50% on your next defeat.</li>
-        <li><strong>Double Risk:</strong> doubles potential damage; if you lose, the damage is also doubled.</li>
-        <li><strong>Critical Hit:</strong> if you reach exactly 21, you deal 8 extra damage to your opponent.</li>
-        <li><strong>Hand Reset:</strong> discard all your cards and draw a new hand once per match.</li>
-        <li><strong>Partial Vision:</strong> view one random opponent card once per round.</li>
-        <li><strong>Recovery:</strong> if you lose by 5 points or less, recover 5 HP at the end of the round.</li>
-        <li><strong>Effect Block:</strong> prevents the opponent from using a modifier in the next round.</li>
-        <li><strong>Last Bet:</strong> when your HP ≤ 15, start each hand with an extra Ace.</li>
+        <li><strong>Coronation Seal (SC):</strong> an absolute victory card. When its effect is triggered, you immediately win the entire match, regardless of remaining HP.</li>
+        <li><strong>Neutralizing Veil (VN):</strong> a tactical lock. Prevents your opponent from using special cards or modifiers in the next round.</li>
+        <li><strong>Reposition Core (NR):</strong> defensive support. If you lose a round by ≤ 5 points, you recover <strong>5 HP</strong> at the end of that round.</li>
+        <li><strong>Lethal Mirror (EL):</strong> high-risk, high-reward. The damage you deal to your opponent is doubled, but if you lose that round, the damage you receive is also doubled.</li>
+        <li><strong>Critical Pulse (PC):</strong> focused on the perfect 21. If your total is exactly <strong>21</strong>, you deal an additional <strong>8 damage</strong> to your opponent.</li>
+        <li><strong>Tolerance Relay (RT):</strong> a safety net against going over. If your total exceeds 21, it is automatically adjusted to <strong>20</strong> while this effect is active.</li>
       </ol>`,
       `<h2 class='text-lg md:text-xl font-title text-[#8bb3ff] font-bold mt-2'>Strategic Tips</h2>
       <ul class='list-disc list-inside space-y-1 text-sm'>
-        <li>Standing at the right moment is better than always chasing 21.</li>
-        <li>Use modifiers strategically to change the outcome.</li>
-        <li>Observe opponent patterns before taking risks.</li>
+        <li>Standing at the right moment is often better than always chasing 21.</li>
+        <li>Use your special cards at key turning points; a single round can decide the whole match.</li>
+        <li>Pay attention to your opponent’s patterns before using high-risk effects like Lethal Mirror.</li>
       </ul>`,
       `<h2 class='text-lg md:text-xl font-title text-[#9edfff] font-bold mt-2'>General Summary</h2>
       <ul class='list-inside space-y-1 text-sm'>
@@ -101,7 +93,7 @@ export const INSTRUCTIONS_TRANSLATIONS = {
         <li>Starting HP: 60</li>
         <li>You lose HP equal to your hand’s value if you lose.</li>
         <li>Average match: 3–4 rounds.</li>
-        <li>No HP gained by winning directly (only via modifiers).</li>
+        <li>No HP is gained from winning directly (only via card effects such as Reposition Core).</li>
       </ul>
       <p class='mt-2 italic text-sm'>*Empire of Wagers* blends probability, risk, and quick calculation.</p>`
     ]
@@ -119,8 +111,8 @@ export const INSTRUCTIONS_TRANSLATIONS = {
       `<h1 class='text-2xl md:text-3xl font-title uppercase font-bold tracking-[0.08em] text-transparent bg-clip-text bg-gradient-to-r from-[#25b6f8] via-[#55d9fb] to-[#bbfafe] mb-2'>Instruções de Uso e Regras do Jogo</h1>`,
       `<p><strong>Empire of Wagers</strong> é um jogo de cartas inspirado no blackjack clássico, criado para partidas curtas e dinâmicas onde estratégia e sorte se combinam.</p>`,
       `<p><strong>Objetivo principal:</strong> chegar o mais próximo possível de <strong>21</strong> sem ultrapassar. Se ultrapassar, você perde a rodada automaticamente. O oponente também tentará chegar a 21.</p>`,
-      `<p><strong>Sistema de vida:</strong> cada jogador começa com <strong>60 pontos de vida (HP)</strong>. Sempre que você perde uma rodada, perde uma quantidade de HP igual ao valor total da sua mão. Exemplo: se terminar com 24 pontos, perde 24 HP. Se terminar com 18 e o oponente tiver 20, perde 18. Em caso de empate, ninguém perde HP.</p>`,
-      `<p><strong>Duração estimada:</strong> uma partida típica dura entre 3 e 4 rodadas, dependendo das decisões e do uso dos modificadores.</p>`,
+      `<p><strong>Sistema de vida:</strong> cada jogador começa com <strong>60 pontos de vida (HP)</strong>. Sempre que você perde uma rodada, perde uma quantidade de HP igual ao valor total da sua mão. Exemplo: se terminar com 24 pontos, perde 24 HP. Se terminar com 18 e o oponente tiver 20, você perde 18 HP. Em caso de empate, ninguém perde HP.</p>`,
+      `<p><strong>Duração estimada:</strong> uma partida típica dura entre 3 e 4 rodadas, dependendo das decisões e do uso das cartas especiais.</p>`,
       `<p><strong>Derrota:</strong> se seu HP chegar a 0, você perde imediatamente. <strong>Vitória:</strong> vence quando todos os oponentes chegam a 0 HP.</p>`,
       `<h2 class='text-lg md:text-xl font-title text-[#9edfff] font-bold mt-2'>Regras básicas do turno</h2>
       <ol class='list-decimal list-inside space-y-1 text-sm'>
@@ -130,24 +122,20 @@ export const INSTRUCTIONS_TRANSLATIONS = {
         <li>Depois, os totais são revelados e comparados.</li>
         <li>Em caso de empate, ninguém perde HP.</li>
       </ol>`,
-      `<h2 class='text-lg md:text-xl font-title text-[#9edfff] font-bold mt-2'>Modificadores do jogo (10 no total)</h2>
+      `<h2 class='text-lg md:text-xl font-title text-[#9edfff] font-bold mt-2'>Cartas especiais / Modificadores (6 no total)</h2>
       <ol class='list-decimal list-inside space-y-1 text-sm'>
-        <li><strong>Sorte do Novato:</strong> uma vez por partida, se ultrapassar 21, ajusta-se automaticamente para 20.</li>
-        <li><strong>Roubo Preciso:</strong> a próxima carta terá valor fixo entre 2 e 6.</li>
-        <li><strong>Escudo de Ferro:</strong> reduz o dano recebido em 50% na próxima derrota.</li>
-        <li><strong>Risco Duplo:</strong> dobra o dano potencial; se perder, o dano também é dobrado.</li>
-        <li><strong>Golpe Crítico:</strong> se alcançar exatamente 21, causa 8 de dano extra.</li>
-        <li><strong>Reinício de Mão:</strong> pode trocar todas as cartas uma vez por partida.</li>
-        <li><strong>Visão Parcial:</strong> veja uma carta aleatória do oponente uma vez por rodada.</li>
-        <li><strong>Recuperação:</strong> se perder por até 5 pontos, recupere 5 HP no final da rodada.</li>
-        <li><strong>Bloqueio de Efeito:</strong> impede o oponente de usar um modificador na próxima rodada.</li>
-        <li><strong>Última Aposta:</strong> se tiver ≤15 HP, começa cada mão com um Ás extra.</li>
+        <li><strong>Selo de Coroação (SC):</strong> carta de vitória absoluta. Quando seu efeito é ativado, você vence a partida imediatamente, independentemente do HP restante.</li>
+        <li><strong>Véu Neutralizador (VN):</strong> bloqueio tático. Impede que o oponente use cartas especiais ou modificadores na próxima rodada.</li>
+        <li><strong>Núcleo de Reposição (NR):</strong> efeito defensivo. Se você perder uma rodada por uma diferença de ≤ 5 pontos, recupera <strong>5 HP</strong> ao final dessa rodada.</li>
+        <li><strong>Espelho Letal (EL):</strong> alto risco, alta recompensa. O dano que você causa ao oponente é dobrado, mas se perder a rodada, o dano que você recebe também é dobrado.</li>
+        <li><strong>Pulso Crítico (PC):</strong> focado no 21 perfeito. Se o seu total for exatamente <strong>21</strong>, você causa <strong>8 pontos de dano extra</strong> ao oponente.</li>
+        <li><strong>Relé de Tolerância (RT):</strong> rede de segurança contra o excesso. Se o seu total passar de 21, ele é ajustado automaticamente para <strong>20</strong> enquanto este efeito estiver ativo.</li>
       </ol>`,
       `<h2 class='text-lg md:text-xl font-title text-[#8bb3ff] font-bold mt-2'>Dicas Estratégicas</h2>
       <ul class='list-disc list-inside space-y-1 text-sm'>
-        <li>Parar no momento certo é melhor do que sempre buscar 21.</li>
-        <li>Use modificadores com inteligência.</li>
-        <li>Observe o padrão de seus oponentes antes de arriscar.</li>
+        <li>Parar no momento certo é melhor do que buscar 21 a qualquer custo.</li>
+        <li>Use suas cartas especiais em momentos decisivos; uma única rodada pode definir a partida.</li>
+        <li>Observe o padrão de jogo dos oponentes antes de arriscar efeitos de alto risco como Espelho Letal.</li>
       </ul>`,
       `<h2 class='text-lg md:text-xl font-title text-[#9edfff] font-bold mt-2'>Resumo geral</h2>
       <ul class='list-inside space-y-1 text-sm'>
@@ -155,7 +143,7 @@ export const INSTRUCTIONS_TRANSLATIONS = {
         <li>Vida inicial: 60 HP</li>
         <li>Perde HP igual ao valor da mão se perder.</li>
         <li>Duração média: 3–4 rodadas.</li>
-        <li>Não ganha HP por vitória direta (apenas com modificadores).</li>
+        <li>Não ganha HP por vitória direta (apenas por efeitos de cartas como Núcleo de Reposição).</li>
       </ul>
       <p class='mt-2 italic text-sm'>*Empire of Wagers* combina probabilidade, risco e cálculo rápido.</p>`
     ]
